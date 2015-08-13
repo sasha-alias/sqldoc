@@ -105,7 +105,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         }
         var chart_id = 'chart_'+this.props.eventKey+'_'+i;
 
-        var hidden_value = '<input id="data_'+chart_id+'" type="hidden" value="'+encodeURIComponent(JSON.stringify(dataset))+'"></input>';
+        var hidden_value = '<input id="data-'+chart_id+'" type="hidden" value="'+encodeURIComponent(JSON.stringify(dataset))+'"></input>';
 
         return(
 
