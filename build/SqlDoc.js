@@ -115,11 +115,11 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
     renderDataset: function(dataset, dataset_idx, query){
 
         if (dataset.resultStatus == 'PGRES_COMMAND_OK'){
-            return React.createElement("div", {key: 'cmdres_'+i, className: "alert alert-success"}, dataset.cmdStatus);
+            return React.createElement("div", {key: 'cmdres_'+dataset_idx, className: "alert alert-success"}, dataset.cmdStatus);
         } else if (['PGRES_FATAL_ERROR', 'PGRES_BAD_RESPONSE'].indexOf(dataset.resultStatus) > -1) {
-            return React.createElement("div", {key: 'err_'+i, className: "query-error alert alert-danger"}, dataset.resultErrorMessage.toString());
+            return React.createElement("div", {key: 'err_'+dataset_idx, className: "query-error alert alert-danger"}, dataset.resultErrorMessage.toString());
         } else if (dataset.resultStatus == 'PGRES_NONFATAL_ERROR') {
-            return React.createElement("div", {key: 'err_'+i, className: "query-error alert alert-info"}, dataset.resultErrorMessage.toString());
+            return React.createElement("div", {key: 'err_'+dataset_idx, className: "query-error alert alert-info"}, dataset.resultErrorMessage.toString());
         }
 
         var fields = dataset.fields;
