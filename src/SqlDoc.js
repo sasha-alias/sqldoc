@@ -4,11 +4,15 @@ var Marked = require('marked');
 var SqlDoc = React.createClass({
 
     getRenderer: function(query){
+        if (this.props.output == 'script'){
+            return this.renderDataset;
+        } else {
             if (query.match('^\\s*---\\s+chart\s*.*') != null){
                 return this.renderChart;
             } else {
                 return this.renderDataset;
             }
+        }
     },
 
     markdown: function(str){
@@ -81,14 +85,8 @@ var SqlDoc = React.createClass({
             var buttonBar = null;
         }
 
-        // charts pre script
-        var prescript = '<script>document.charts_data = {};</script>';
-        var charts_prescript = <div dangerouslySetInnerHTML={{__html: prescript }} />
-        
-
         return (
             <div className="output-console">
-                {charts_prescript}
                 {buttonBar}
                 {blocks}
             </div>
