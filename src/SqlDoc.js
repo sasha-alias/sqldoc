@@ -57,7 +57,7 @@ var SqlDoc = React.createClass({
             
             var renderer = this.getRenderer(this.props.data[block_idx].query);
             var datasets = this.props.data[block_idx].datasets.map(function(dataset, i){
-                return renderer(dataset, block_idx, self.props.data[block_idx].query);
+                return renderer(dataset, block_idx*1000+i, self.props.data[block_idx].query);
             });
 
             var header = this.getHeader(this.props.data[block_idx].query);
