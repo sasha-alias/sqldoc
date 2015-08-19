@@ -53,6 +53,13 @@ describe('SqlDoc:', function(){
     it('check script output', function(){
         var data = [{"query":"--- chart pie\nSELECT city, COUNT(*) FROM employees GROUP BY city\n\n","datasets":[{"nrecords":3,"fields":[{"name":"city","type":25},{"name":"count","type":20}],"data":[["London","245"],["Paris","153"],["New York","323"]],"cmdStatus":"SELECT 3","resultStatus":"PGRES_TUPLES_OK","resultErrorMessage":""}],"start_time":2864.9700000023586,"duration":50.404}]
         var doc = React.createElement(SqlDoc, {data:data, output:"script"});
+        //console.log(React.renderToStaticMarkup(doc));
+
+    });
+
+    it('check chart with args', function(){
+        var data = [{"query":"--- chart pie args\nSELECT city, COUNT(*) FROM employees GROUP BY city\n\n","datasets":[{"nrecords":3,"fields":[{"name":"city","type":25},{"name":"count","type":20}],"data":[["London","245"],["Paris","153"],["New York","323"]],"cmdStatus":"SELECT 3","resultStatus":"PGRES_TUPLES_OK","resultErrorMessage":""}],"start_time":2864.9700000023586,"duration":50.404}]
+        var doc = React.createElement(SqlDoc, {data:data});
         console.log(React.renderToStaticMarkup(doc));
 
     });

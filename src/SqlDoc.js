@@ -98,6 +98,8 @@ var SqlDoc = React.createClass({
     renderChart: function(dataset, i, query){
 
         var chart_type = query.match('^\\s*---\\s+chart\\s+([a-z\\-]*)')[1];
+        var chart_args = query.match('^\\s*---\\s+chart\\s+[a-z\\-]*\\s*(.*)\\n')[1];
+
         if (chart_type == ''){
             chart_type = 'line';
         }
@@ -107,7 +109,11 @@ var SqlDoc = React.createClass({
 
         return(
 
-            <div data-chart-id={chart_id} data-chart-type={chart_type} dangerouslySetInnerHTML={{__html: hidden_value}} />
+            <div 
+                data-chart-id={chart_id} 
+                data-chart-type={chart_type} 
+                data-chart-args={chart_args}
+                dangerouslySetInnerHTML={{__html: hidden_value}} />
 
         );
     },
