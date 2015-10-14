@@ -97,6 +97,10 @@ var SqlDoc = React.createClass({
 
     renderChart: function(dataset, i, query){
 
+        if (['PGRES_FATAL_ERROR', 'PGRES_BAD_RESPONSE'].indexOf(dataset.resultStatus) > -1) {
+            return <div key={'err_'+i} className="query-error alert alert-danger">{dataset.resultErrorMessage.toString()}</div>;
+        }
+
         var chart_type = query.match('^\\s*---\\s+chart\\s+([a-z\\-]*)')[1];
         var chart_args = query.match('^\\s*---\\s+chart\\s+[a-z\\-]*\\s*(.*)\\n')[1];
 
