@@ -64,20 +64,6 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         var blocks = [];
         var duration = 0;
 
-        // button bar
-        if (this.props.buttonBar == true){
-            var buttonBar = React.createElement("div", {className: "duration-div"}, 
-                React.createElement("table", {className: "duration-table"}, 
-                React.createElement("tr", null, 
-                React.createElement("td", null, React.createElement("span", {className: "duration-word"}, "Time:"), " ", React.createElement("span", {className: "duration-number"}, duration), " ", React.createElement("span", {className: "duration-word"}, "ms")), 
-                React.createElement("td", null, React.createElement("button", {type: "button", className: "btn btn-info", onClick: this.props.onShare}, "share"))
-                )
-                )
-                );
-        } else {
-            var buttonBar = null;
-        }
-
         // document blocks
         this.rendered_records = {};
         for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
@@ -97,6 +83,21 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             block = React.createElement("div", {key: "block_"+block_idx}, header, datasets, footer);
             blocks.push(block);
         }
+
+        // button bar
+        if (this.props.buttonBar == true){
+            var buttonBar = React.createElement("div", {className: "duration-div"}, 
+                React.createElement("table", {className: "duration-table"}, 
+                React.createElement("tr", null, 
+                React.createElement("td", null, React.createElement("span", {className: "duration-word"}, "Time:"), " ", React.createElement("span", {className: "duration-number"}, duration), " ", React.createElement("span", {className: "duration-word"}, "ms")), 
+                React.createElement("td", null, React.createElement("button", {type: "button", className: "btn btn-info", onClick: this.props.onShare}, "share"))
+                )
+                )
+                );
+        } else {
+            var buttonBar = null;
+        }
+
 
         return (
             React.createElement("div", {className: "output-console"}, 

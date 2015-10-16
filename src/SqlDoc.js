@@ -64,20 +64,6 @@ var SqlDoc = React.createClass({
         var blocks = [];
         var duration = 0;
 
-        // button bar
-        if (this.props.buttonBar == true){
-            var buttonBar = <div className="duration-div">
-                <table className="duration-table">
-                <tr>
-                <td><span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span></td>
-                <td><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></td>
-                </tr>
-                </table>
-                </div>;
-        } else {
-            var buttonBar = null;
-        }
-
         // document blocks
         this.rendered_records = {};
         for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
@@ -97,6 +83,21 @@ var SqlDoc = React.createClass({
             block = <div key={"block_"+block_idx}>{header}{datasets}{footer}</div>;
             blocks.push(block);
         }
+
+        // button bar
+        if (this.props.buttonBar == true){
+            var buttonBar = <div className="duration-div">
+                <table className="duration-table">
+                <tr>
+                <td><span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span></td>
+                <td><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></td>
+                </tr>
+                </table>
+                </div>;
+        } else {
+            var buttonBar = null;
+        }
+
 
         return (
             <div className="output-console">
