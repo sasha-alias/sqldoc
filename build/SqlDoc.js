@@ -14,12 +14,17 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
 
     getRenderer: function(query){
         if (this.props.output == 'script'){
-            return this.renderDataset;
+            return this.renderTable;
         } else {
             if (query.match('^\\s*---\\s+chart\s*.*') != null){
                 return this.renderChart;
-            } else {
-                return this.renderDataset;
+            } else if (query.match('^\\s*---\\s+csv\s*.*') != null){
+                return this.renderCsv;
+            } else if (query.match('^\\s*---\\s+hidden\s*.*') != null){
+                return this.renderHidden;
+            }
+            else {
+                return this.renderTable;
             }
         }
     },
@@ -168,12 +173,15 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         var row = this.props.data[block_idx].datasets[dataset_idx].data[record_idx];
         for (var column_idx=0; column_idx < row.length; column_idx++){
             var val = row[column_idx];
+            if (val != null){
+                val = val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            }
             fields += '<td>'+val+'</td>';
         }
         return '<tr>'+fields+'</tr>';
     },
 
-    renderDataset: function(block_idx, dataset, dataset_idx, query){
+    renderTable: function(block_idx, dataset, dataset_idx, query){
 
         var dsid = this.dsid(block_idx, dataset_idx);
 
@@ -198,32 +206,32 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             });
         };
 
-        var out_rows = [];
+        var out_rows = "";
         var omitted_count = 0;
-        var limit = Math.min(100, rows.length-this.rendered_records[dsid]); // render only 1st 100 records, the rest render on scroll
-
+        if (this.props.buttonBar){
+            var limit = Math.min(100, rows.length-this.rendered_records[dsid]); // render only 1st 100 records, the rest render on scroll
+        } else {
+            var limit = rows.length; // render all
+        }
+        
         for (var i=this.rendered_records[dsid]; i <= limit; i++){
 
             if (i == limit){
                 if (i<rows.length){
                     var omitted_count = rows.length - this.rendered_records[dsid] + 1;
-                    var omitted_message = React.createElement("span", {id: this.limit_ref(dsid), className: "omitted-message"}, omitted_count, " more ");
+                    var omitted_message = '<span id="'+this.limit_ref(dsid)+'" class="omitted-message">'+omitted_count+' more </span>';
                 }
                 break;
             }
 
-            var row = this.renderRecord(block_idx, dataset_idx, i);
+            var row = this.renderStaticRecord(block_idx, dataset_idx, i);
             this.rendered_records[dsid] = this.rendered_records[dsid] + 1;
 
-            out_rows.push(row);
+            out_rows += row;
         }
 
         if (omitted_count > 0){
-            out_rows.push(
-                React.createElement("tr", null, 
-                    React.createElement("td", {colSpan: fields.length+1}, omitted_message)
-                )
-            );
+            out_rows += '<tr><td colSpan="'+fields.length+1+'">'+omitted_message+'</td></tr>';
         }
 
         if (dataset.nrecords == 1){
@@ -248,12 +256,70 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                     out_fields
                     )
                 ), 
-                React.createElement("tbody", null, 
-                out_rows
+                React.createElement("tbody", {dangerouslySetInnerHTML: {__html: out_rows}}
                 )
                 )
             )
         );
+    },
+
+    renderCsv: function(block_idx, dataset, dataset_idx, query){
+        var dsid = this.dsid(block_idx, dataset_idx);
+
+        var out_fields = [];
+        if (dataset.fields){
+            var out_fields = dataset.fields.map(function(field, i){
+                var ret = [];
+                ret.push(React.createElement("span", {className: "csv-field", key: "field_"+dsid+"_"+i}, '"'+field.name+'"'));
+                if (i < dataset.fields.length-1){
+                    ret.push(React.createElement("span", {className: "csv-separator"}, ","));
+                }
+                return ret;
+            });
+        } 
+        out_fields.push(React.createElement("br", null));
+
+        var csv = "";
+
+        for (var i=0; i<dataset.data.length; i++){
+            var row = "";
+            for (var j=0; j<dataset.data[i].length; j++){
+                var val = dataset.data[i][j];
+                if (val == null){
+                    row += '<span class="csv-value">NULL</span>'; 
+                } else {
+                    row += '<span class="csv-value">"' + val.replace('"', '""') + '"</span>'; 
+                }
+                if (j != dataset.data[i].length-1){
+                    row += '<span class="csv-separator">,</span>'; 
+                }
+            }
+            row += "<br/>";
+            csv += row;
+        }
+
+        if (dataset.nrecords == 1){
+            rword = 'row';
+        } else {
+            rword = 'rows';
+        }
+        
+        return (
+        React.createElement("div", {key: 'dataset_'+dsid}, 
+            React.createElement("div", {className: "rows-count-div"}, 
+            React.createElement("span", {className: "rows-count-bracket"}, "("), 
+            React.createElement("span", {className: "rows-count-number"}, dataset.nrecords), " ", React.createElement("span", {className: "rows-count-word"}, rword), 
+            React.createElement("span", {className: "rows-count-bracket"}, ")")
+            ), 
+            React.createElement("div", {className: "csv-fields-div"}, 
+            out_fields
+            ), 
+            React.createElement("div", {className: "csv-div", dangerouslySetInnerHTML: {__html: csv}})
+        ));
+    },
+
+    renderHidden: function(block_idx, dataset, dataset_idx, query){
+        return null;
     },
 
     scrollHandler: function(e){
