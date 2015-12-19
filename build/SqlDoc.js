@@ -4,6 +4,12 @@ var $ = require('jquery');
 
 var SqlDoc = React.createClass({displayName: "SqlDoc",
 
+    getInitialState: function(){
+        this.floating_dsid = null;
+        this.tables_headers = {};
+        return null;
+    },
+
     componentDidMount: function(){
         React.findDOMNode(this).addEventListener('scroll', this.scrollHandler);
     },
@@ -69,6 +75,9 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         var blocks = [];
         var duration = 0;
 
+        // floating columns header
+        var floating_cols_header = React.createElement("div", {id: "floating-cols-header-"+this.props.eventKey, className: "floating-cols-header"}, "header")
+
         // document blocks
         this.rendered_records = {};
         for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
@@ -106,6 +115,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
 
         return (
             React.createElement("div", {className: "output-console"}, 
+                floating_cols_header, 
                 buttonBar, 
                 blocks
             )
@@ -204,6 +214,13 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             var out_fields = fields.map(function(field, i){
                 return (React.createElement("th", {key: 'field_'+i}, field.name));
             });
+            out_fields.unshift(React.createElement("th", null, "#"));
+
+            var floating_fields = fields.map(function(field, i){
+                return (React.createElement("div", {className: "floating-field", key: 'field_'+i}, field.name));
+            });
+            floating_fields.unshift(React.createElement("div", {className: "floating-field"}, "#"));
+            this.tables_headers[dsid] = floating_fields;
         };
 
         var out_rows = "";
@@ -239,7 +256,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         } else {
             rword = 'rows';
         }
-        
+
         return (
 
             React.createElement("div", {key: 'dataset_'+dsid}, 
@@ -249,12 +266,14 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                 React.createElement("span", {className: "rows-count-bracket"}, ")")
                 ), 
 
-                React.createElement("table", {key: 'dataset_'+dsid, className: "table-resultset table table-hover"}, 
+                React.createElement("table", {id: 'dataset_'+dsid, className: "table-resultset table table-hover"}, 
                 React.createElement("thead", null, 
-                    React.createElement("tr", null, 
-                    React.createElement("th", {className: "rownum"}, "#"), 
+                    React.createElement("tr", {id: "theader_"+dsid}, 
                     out_fields
                     )
+                ), 
+                React.createElement("tfoot", null, 
+                    React.createElement("tr", {id: "tfooter_"+dsid}, React.createElement("td", null))
                 ), 
                 React.createElement("tbody", {dangerouslySetInnerHTML: {__html: out_rows}}
                 )
@@ -328,6 +347,24 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             for (var dataset_idx=0; dataset_idx < this.props.data[block_idx].datasets.length; dataset_idx++){
 
                 var dsid = this.dsid(block_idx, dataset_idx);
+
+
+                // hide/show floating header
+                var theader = $("#theader_"+dsid);
+                var tfooter = $("#tfooter_"+dsid);
+                var theader_offset = theader.offset().top - container.offset().top + theader.height();
+                var tfooter_offset = tfooter.offset().top - container.offset().top;
+
+                if (theader_offset < 0 && tfooter_offset > 0){
+                    this.floating_dsid = dsid;
+                    this.showFloatingHeader(dsid, theader.offset().left);
+                } else {
+                    if (dsid == this.floating_dsid){
+                        this.hideFloatingHeader(dsid);
+                    }
+                }
+
+                // render more records if needed
                 var rendered = this.rendered_records[dsid];
                 var len = this.props.data[block_idx].datasets[dataset_idx].data.length;
                 if (rendered == len){
@@ -343,6 +380,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                         this.renderNext(block_idx, dataset_idx);
                     }
                 }
+
             }
         }
     },
@@ -378,6 +416,48 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             limit_item.text(rest+' more');
         }
     },
+
+    floatingHeader: function(){
+        return $('#floating-cols-header-'+this.props.eventKey);
+    },
+
+    showFloatingHeader: function(dsid, left){
+        var self = this;
+        this.floatingHeader().show().offset({
+            left: left
+        });
+        var header_cols = (React.createElement("div", {className: "floating-header-table"}, 
+            this.tables_headers[dsid]
+            ));
+
+        this.floatingHeader().html(React.renderToStaticMarkup(header_cols));
+
+        this.floatingHeader().css({width: $('#dataset_'+dsid).width()});
+
+        // get width of each column
+        widths = [];
+        $('#dataset_'+dsid+' th').each(function(){
+            widths.push($(this).outerWidth());
+        });
+
+        // set width of floating column
+        $('#floating-cols-header-'+this.props.eventKey+' .floating-field').each(function(i){
+            $(this).css({width: widths[i]});
+        });
+
+        $(".output-console").bind('resize', function(e) {
+            self.showFloatingHeader(dsid, left);
+        });
+        
+    },
+
+    hideFloatingHeader: function(dsid){
+        this.floatingHeader().hide();
+    },
+
+    adjustFloatingHeader: function(){
+        console.log(this.floatingHeader().is(':visible'));
+    }
 
 
 });
