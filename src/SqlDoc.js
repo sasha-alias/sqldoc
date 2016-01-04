@@ -128,10 +128,11 @@ var SqlDoc = React.createClass({
         return this.props.eventKey+"_"+block_idx+"_"+dataset_idx;
     },
 
-    renderChart: function(block_idx, dataset, i, query){
+    renderChart: function(block_idx, dataset, dataset_idx, query){
+        var dsid = this.dsid(block_idx, dataset_idx);
 
         if (['PGRES_FATAL_ERROR', 'PGRES_BAD_RESPONSE'].indexOf(dataset.resultStatus) > -1) {
-            return <div key={'err_'+i} className="query-error alert alert-danger">{dataset.resultErrorMessage.toString()}</div>;
+            return <div key={'err_'+dataset_idx} className="query-error alert alert-danger">{dataset.resultErrorMessage.toString()}</div>;
         }
 
         var chart_type = query.match('^\\s*---\\s+chart\\s+([a-z\\-]*)')[1];
@@ -140,7 +141,7 @@ var SqlDoc = React.createClass({
         if (chart_type == ''){
             chart_type = 'line';
         }
-        var chart_id = 'chart_'+this.props.eventKey+'_'+i;
+        var chart_id = 'chart_'+dsid;
 
         var hidden_value = '<input id="data_'+chart_id+'" type="hidden" value="'+encodeURIComponent(JSON.stringify(dataset))+'"></input>';
 
@@ -352,6 +353,9 @@ var SqlDoc = React.createClass({
                 // hide/show floating header
                 var theader = $("#theader_"+dsid);
                 var tfooter = $("#tfooter_"+dsid);
+                if (typeof(theader.offset()) == 'undefined'){ // skip nontable blocks
+                    continue;
+                }
                 var theader_offset = theader.offset().top - container.offset().top + theader.height();
                 var tfooter_offset = tfooter.offset().top - container.offset().top;
 
