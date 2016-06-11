@@ -85,7 +85,7 @@ var SqlDoc = React.createClass({
             var duration = 0;
 
             // floating columns header
-            var floating_cols_header = <div id={"floating-cols-header-"+this.props.eventKey} className="floating-cols-header">header</div>
+            var floating_cols_header = <div id={"floating-cols-header-"+this.props.eventKey} className="floating-cols-header"></div>
 
             // document blocks
             this.rendered_records = {};
