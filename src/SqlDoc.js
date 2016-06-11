@@ -44,7 +44,7 @@ var SqlDoc = React.createClass({
     },
 
     getHeader: function(query){
-        var cut = query.replace(/^\s*---.*[\s\n]*/, ''); 
+        var cut = query.replace(/^\s*---.*[\s\n]*/, '');
         var match = cut.match('^\s*/\\*\\*([\\s\\S]*?)\\*\\*/');
         if (match != null && match.length == 2){
             return <div className="markdown-block" dangerouslySetInnerHTML={{__html: this.markdown(match[1]) }} />;
@@ -56,7 +56,7 @@ var SqlDoc = React.createClass({
     getFooter: function(query){
         var idx = query.lastIndexOf('/**');
         var idx0 = query.indexOf('/**');
-        var check = query.replace(/^\s*---.*[\s\n]*/, ''); 
+        var check = query.replace(/^\s*---.*[\s\n]*/, '');
         if (check.substr(0,3) == '/**' && idx == idx0){ // a single markdown passed, already generated as a header so pass by
             return null;
         }
@@ -69,59 +69,81 @@ var SqlDoc = React.createClass({
         }
     },
 
+    getBlockQuery: function(query){
+        if (typeof(this.props.showQuery) == 'undefined' || this.props.showQuery == false){
+            return null;
+        }
+        return <div className="query-block"><pre>{query}</pre></div>;
+    },
+
     render: function(){
-        
-        var self = this;
-        var blocks = [];
-        var duration = 0;
 
-        // floating columns header
-        var floating_cols_header = <div id={"floating-cols-header-"+this.props.eventKey} className="floating-cols-header">header</div>
+        try {
 
-        // document blocks
-        this.rendered_records = {};
-        for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
-            
-            duration += this.props.data[block_idx].duration;
-            
-            var renderer = this.getRenderer(this.props.data[block_idx].query);
-            var datasets = this.props.data[block_idx].datasets.map(function(dataset, i){
-                var dsid = self.dsid(block_idx, i);
-                self.rendered_records[dsid] = 0;
-                return renderer(block_idx, dataset, i, self.props.data[block_idx].query);
-            });
+            var self = this;
+            var blocks = [];
+            var duration = 0;
 
-            var header = this.getHeader(this.props.data[block_idx].query);
-            var footer = this.getFooter(this.props.data[block_idx].query);
+            // floating columns header
+            var floating_cols_header = <div id={"floating-cols-header-"+this.props.eventKey} className="floating-cols-header">header</div>
 
-            block = <div key={"block_"+block_idx}>{header}{datasets}{footer}</div>;
-            blocks.push(block);
+            // document blocks
+            this.rendered_records = {};
+            for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
+
+                duration += this.props.data[block_idx].duration;
+
+                var renderer = this.getRenderer(this.props.data[block_idx].query);
+                var datasets = this.props.data[block_idx].datasets.map(function(dataset, i){
+                    var dsid = self.dsid(block_idx, i);
+                    self.rendered_records[dsid] = 0;
+                    return renderer(block_idx, dataset, i, self.props.data[block_idx].query);
+                });
+
+                var header = this.getHeader(this.props.data[block_idx].query);
+                var footer = this.getFooter(this.props.data[block_idx].query);
+                var block_query = this.getBlockQuery(this.props.data[block_idx].query);
+
+                block = <div key={"block_"+block_idx}>{block_query}{header}{datasets}{footer}</div>;
+                blocks.push(block);
+            }
+
+            // button bar
+            if (this.props.buttonBar == true){
+                var buttonBar = <div className="duration-div">
+                    <table className="duration-table">
+                    <tr>
+                    <td><span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span></td>
+                    <td><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></td>
+                    </tr>
+                    </table>
+                    </div>;
+            } else {
+                var buttonBar = null;
+            }
+
+
+            return (
+                <div className="output-console">
+                    {floating_cols_header}
+                    {buttonBar}
+                    {blocks}
+                </div>
+            );
+
+            return <div/>
+
+        } catch (err){
+            return (
+
+                <div className="error alert alert-danger">
+                    SQLTABS ERROR. Please report the issue at <b>https://github.com/sasha-alias/sqltabs/issues</b> :<br/>
+                    <pre>
+                    {err.stack}
+                    </pre>
+                </div>
+            );
         }
-
-        // button bar
-        if (this.props.buttonBar == true){
-            var buttonBar = <div className="duration-div">
-                <table className="duration-table">
-                <tr>
-                <td><span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span></td>
-                <td><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></td>
-                </tr>
-                </table>
-                </div>;
-        } else {
-            var buttonBar = null;
-        }
-
-
-        return (
-            <div className="output-console">
-                {floating_cols_header}
-                {buttonBar}
-                {blocks}
-            </div>
-        );
-
-        return <div/>
     },
 
     dsid: function(block_idx, dataset_idx){
@@ -135,21 +157,28 @@ var SqlDoc = React.createClass({
             return <div key={'err_'+dataset_idx} className="query-error alert alert-danger">{dataset.resultErrorMessage.toString()}</div>;
         }
 
-        var chart_type = query.match('^\\s*---\\s+chart\\s+([a-z\\-]*)')[1];
-        var chart_args = query.match('^\\s*---\\s+chart\\s+[a-z\\-]*\\s*(.*)\\n')[1];
-
-        if (chart_type == ''){
+        var chart_type = query.match('^\\s*---\\s+chart\\s+([a-z\\-]*)\\s');
+        if (chart_type != null && chart_type.length > 0){
+            chart_type = chart_type[1];
+        } else {
             chart_type = 'line';
         }
+        var chart_args = query.match('^\\s*---\\s+chart\\s+[a-z\\-]*\\s*(.*)\\n');
+        if (chart_args != null && chart_args.length > 0){
+            chart_args = chart_args[1];
+        } else {
+            chart_args = '';
+        };
+
         var chart_id = 'chart_'+dsid;
 
         var hidden_value = '<input id="data_'+chart_id+'" type="hidden" value="'+encodeURIComponent(JSON.stringify(dataset))+'"></input>';
 
         return(
 
-            <div 
-                data-chart-id={chart_id} 
-                data-chart-type={chart_type} 
+            <div
+                data-chart-id={chart_id}
+                data-chart-type={chart_type}
                 data-chart-args={chart_args}
                 dangerouslySetInnerHTML={{__html: hidden_value}} />
 
@@ -231,7 +260,7 @@ var SqlDoc = React.createClass({
         } else {
             var limit = rows.length; // render all
         }
-        
+
         for (var i=this.rendered_records[dsid]; i <= limit; i++){
 
             if (i == limit){
@@ -296,7 +325,7 @@ var SqlDoc = React.createClass({
                 }
                 return ret;
             });
-        } 
+        }
         out_fields.push(<br/>);
 
         var csv = "";
@@ -306,12 +335,12 @@ var SqlDoc = React.createClass({
             for (var j=0; j<dataset.data[i].length; j++){
                 var val = dataset.data[i][j];
                 if (val == null){
-                    row += '<span class="csv-value">NULL</span>'; 
+                    row += '<span class="csv-value">NULL</span>';
                 } else {
-                    row += '<span class="csv-value">"' + val.replace('"', '""') + '"</span>'; 
+                    row += '<span class="csv-value">"' + val.replace('"', '""') + '"</span>';
                 }
                 if (j != dataset.data[i].length-1){
-                    row += '<span class="csv-separator">,</span>'; 
+                    row += '<span class="csv-separator">,</span>';
                 }
             }
             row += "<br/>";
@@ -323,7 +352,7 @@ var SqlDoc = React.createClass({
         } else {
             rword = 'rows';
         }
-        
+
         return (
         <div key={'dataset_'+dsid}>
             <div className="rows-count-div">
@@ -408,7 +437,7 @@ var SqlDoc = React.createClass({
 
             insert_html += row_html;
         }
-        
+
         if (insert_html != ''){
             limit_item.closest('TR').before(insert_html);
         }
@@ -452,7 +481,7 @@ var SqlDoc = React.createClass({
         $(".output-console").bind('resize', function(e) {
             self.showFloatingHeader(dsid, left);
         });
-        
+
     },
 
     hideFloatingHeader: function(dsid){
