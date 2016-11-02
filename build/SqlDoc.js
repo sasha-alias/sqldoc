@@ -7,15 +7,20 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
     getInitialState: function(){
         this.floating_dsid = null;
         this.tables_headers = {};
+        this.lastkeys = [0, 0]; // monitor for CMD+A for selection
         return null;
     },
 
     componentDidMount: function(){
         React.findDOMNode(this).addEventListener('scroll', this.scrollHandler);
+        window.addEventListener('keydown', this.keyHandler);
+        window.addEventListener('keyup', this.keyUpHandler);
     },
 
     componentWillUnmount: function(){
         React.findDOMNode(this).removeEventListener('scroll', this.scrollHandler);
+        window.removeEventListener('keydown', this.keyHandler);
+        window.removeEventListener('keyup', this.keyUpHandler);
     },
 
     getRenderer: function(query){
@@ -369,6 +374,35 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
 
     renderHidden: function(block_idx, dataset, dataset_idx, query){
         return null;
+    },
+
+    selectAll: function(){ // select content of entire output
+        node = React.findDOMNode(this);
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+    },
+
+    keyHandler: function(e){ // follow the pressed keys and trigger selectAll when ctrl+a or cmd+a pressed
+        this.lastkeys[0] = this.lastkeys[1];
+        this.lastkeys[1] = e.keyCode;
+        if (
+            this.lastkeys[0] == 91 && this.lastkeys[1] == 65 || // left cmd + a
+            this.lastkeys[0] == 93 && this.lastkeys[1] == 65 || // right cmd + a
+            this.lastkeys[0] == 17 && this.lastkeys[1] == 65    // ctrl + a
+        ){
+            this.selectAll();
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    },
+
+    keyUpHandler: function(e){ // reset lastkeys if the cmd or ctrl key was released
+        if (e.keyCode == 91 || e.keyCode == 17){
+            this.lastkeys = [0, 0];
+        }
     },
 
     scrollHandler: function(e){
