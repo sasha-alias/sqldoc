@@ -2,6 +2,24 @@ var React = require('react');
 var Marked = require('marked');
 var $ = require('jquery');
 
+var formatValue = function(value){
+    // escape html tags
+    value = value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // replace non-printed characters with their hex codes
+    var non_printed_chars = [1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
+
+    if (non_printed_chars.some(function(c){ return value.indexOf(String.fromCharCode(c)) >= 0; })) { // if at least one non printed character found
+
+        non_printed_chars.forEach(function(c){
+            var c_hex = '<span class="non-printed-char">\\x'+c.toString(16).toUpperCase()+'</span>';
+            var c_str = String.fromCharCode(c);
+            value = value.replace(c_str, c_hex);
+        });
+    }
+    return value;
+}
+
 var SqlDoc = React.createClass({displayName: "SqlDoc",
 
     getInitialState: function(){
@@ -33,8 +51,9 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                 return this.renderCsv;
             } else if (query.match('^\\s*---\\s+hidden\s*.*') != null){
                 return this.renderHidden;
-            }
-            else {
+            } else if (query.match('^\\s*---\\s+crosstable\s*.*') != null){
+                return this.renderCrossTable;
+            } else {
                 return this.renderTable;
             }
         }
@@ -219,7 +238,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         for (var column_idx=0; column_idx < row.length; column_idx++){
             var val = row[column_idx];
             if (val != null){
-                val = val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                val = formatValue(val);
             }
             fields += '<td>'+val+'</td>';
         }
@@ -314,6 +333,57 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                 )
                 )
             )
+        );
+    },
+
+    renderCrossTable: function(block_idx, dataset, dataset_idx, query){
+        console.log(dataset);
+        var data = dataset.data;
+        var header = [];
+        var sidebar = [];
+        var rows = {};
+        for (rn in data){
+
+            var val1 = data[rn][0];
+            var val2 = data[rn][1];
+
+            if (header.indexOf(val2) == -1){
+                header.push(val2);
+            }
+
+            if (sidebar.indexOf(val1) == -1){
+                sidebar.push(val1);
+            }
+
+            if (!(val1 in rows)){
+                rows[val1] = [];
+            }
+            rows[val1].push(data[rn][2]);
+        }
+
+        var header_html = [React.createElement("td", null)];
+        header.forEach(function(item){
+            header_html.push(React.createElement("th", null, item));
+        });
+        header_html = React.createElement("tr", null, header_html);
+        var rows_html = [];
+        sidebar.forEach(function(item){
+            var row = [];
+            row.push(React.createElement("th", null, item));
+            for (i in rows[item]){
+                row.push(
+                    React.createElement("td", null, rows[item][i])
+                );
+            }
+            rows_html.push(React.createElement("tr", null, row));
+        });
+
+        return (
+            React.createElement("table", {className: "table-resultset table table-bordered"}, 
+                header_html, 
+                rows_html
+            )
+
         );
     },
 
