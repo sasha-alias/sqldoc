@@ -17,6 +17,11 @@ var formatValue = function(value){
             value = value.replace(c_str, c_hex);
         });
     }
+
+    // make links from URLs
+    if (value.indexOf('http://') == 0 || value.indexOf('https://') == 0){
+        value = '<a href="#" onClick="openExternal(\''+value+'\')">'+value+'</a>';
+    }
     return value;
 }
 
@@ -53,6 +58,8 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                 return this.renderHidden;
             } else if (query.match('^\\s*---\\s+crosstable\s*.*') != null){
                 return this.renderCrossTable;
+            } else if (query.match('^\\s*---\\s+map\s*') != null){
+                return this.renderMap;
             } else {
                 return this.renderTable;
             }
@@ -217,37 +224,59 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         return $("#"+this.limit_ref(dsid));
     },
 
-    renderRecord: function(block_idx, dataset_idx, record_idx){
-        fields = [React.createElement("td", {key: 'col_rownum_'+this.props.eventKey+'_'+dataset_idx+'_'+record_idx}, record_idx+1)];
+    renderStaticRecord: function(block_idx, dataset_idx, record_idx, hlr_column){
+        // generating text html is much faster than using react
+
+        var fields = '<td class="record-rownum">'+(record_idx+1)+'</td>';
         var row = this.props.data[block_idx].datasets[dataset_idx].data[record_idx];
         for (var column_idx=0; column_idx < row.length; column_idx++){
-            var val = row[column_idx];
-            fields.push(
-                React.createElement("td", {key: 'col_'+this.props.eventKey+'_'+dataset_idx+'_'+record_idx+'_'+column_idx}, 
-                    val
-                )
-            );
+            if (column_idx == hlr_column-1){ // skip rendering record highligting column
+                continue;
+            } else {
+                var val = row[column_idx];
+                if (val != null){
+                    val = formatValue(val);
+                }
+                fields += '<td>'+val+'</td>';
+            }
         }
-        return React.createElement("tr", {key: 'row_'+this.props.eventKey+'_'+dataset_idx+'_'+record_idx}, fields);
+
+        if (hlr_column != null && row.length >= hlr_column){
+            var hlr_value = row[hlr_column-1];
+            if (hlr_value == -1){
+                var tr_class = "record-negative-hl";
+            } else if (hlr_value == 0){
+                var tr_class = "record-neutral-hl";
+            } else if (hlr_value == 1){
+                var tr_class = "record-positive-hl";
+            } else {
+                var tr_class = "record-no-hl";
+            }
+        } else {
+            var tr_class = 'record-no-hl';
+        }
+        return '<tr class="'+tr_class+'">'+fields+'</tr>';
     },
 
-    renderStaticRecord: function(block_idx, dataset_idx, record_idx){
-        // generating text html is much faster than using react
-        fields = '<td>'+(record_idx+1)+'</td>';
-        var row = this.props.data[block_idx].datasets[dataset_idx].data[record_idx];
-        for (var column_idx=0; column_idx < row.length; column_idx++){
-            var val = row[column_idx];
-            if (val != null){
-                val = formatValue(val);
-            }
-            fields += '<td>'+val+'</td>';
+    getRecordHighlightingColumn: function(block_idx){
+        // record highlighting column is the `hlr=N` parameter defining the column number which is responsible for record highlighting
+
+        var query = this.props.data[block_idx].query;
+
+        var hlr_column = query.match("\\s*hlr\\s*=\\s*([0-9]*)");
+        if (hlr_column != null && hlr_column.length > 0){
+            var hlr_column = hlr_column[1];
+        } else {
+            var hlr_column = null;
         }
-        return '<tr>'+fields+'</tr>';
+        console.log(hlr_column);
+        return hlr_column;
     },
 
     renderTable: function(block_idx, dataset, dataset_idx, query){
 
         var dsid = this.dsid(block_idx, dataset_idx);
+
 
         if (dataset.resultStatus == 'PGRES_COMMAND_OK'){
             return React.createElement("div", {key: 'cmdres_'+dsid, className: "alert alert-success"}, dataset.cmdStatus);
@@ -256,6 +285,9 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         } else if (dataset.resultStatus == 'PGRES_NONFATAL_ERROR') {
             return React.createElement("div", {key: 'err_'+dsid, className: "query-error alert alert-info"}, dataset.resultErrorMessage.toString());
         }
+
+        // record highliting column option
+        var hlr_column = this.getRecordHighlightingColumn(block_idx);
 
         var fields = dataset.fields;
         var rows = dataset.data;
@@ -266,12 +298,16 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
 
         if (fields){
             var out_fields = fields.map(function(field, i){
-                return (React.createElement("th", {key: 'field_'+i}, field.name));
+                if (i != hlr_column-1){ // skip record highlighting column
+                    return (React.createElement("th", {key: 'field_'+i}, field.name));
+                }
             });
             out_fields.unshift(React.createElement("th", null, "#"));
 
             var floating_fields = fields.map(function(field, i){
-                return (React.createElement("div", {className: "floating-field", key: 'field_'+i}, field.name));
+                if (i != hlr_column-1){ // skip record highlighting column
+                    return (React.createElement("div", {className: "floating-field", key: 'field_'+i}, field.name));
+                }
             });
             floating_fields.unshift(React.createElement("div", {className: "floating-field"}, "#"));
             this.tables_headers[dsid] = floating_fields;
@@ -295,7 +331,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
                 break;
             }
 
-            var row = this.renderStaticRecord(block_idx, dataset_idx, i);
+            var row = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column);
             this.rendered_records[dsid] = this.rendered_records[dsid] + 1;
 
             out_rows += row;
@@ -337,7 +373,6 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
     },
 
     renderCrossTable: function(block_idx, dataset, dataset_idx, query){
-        console.log(dataset);
         var data = dataset.data;
         var header = [];
         var sidebar = [];
@@ -385,6 +420,10 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
             )
 
         );
+    },
+
+    renderMap: function(block_idx, dataset, dataset_idx, query){
+        return React.createElement("div", {className: "error alert alert-danger"}, " map rendering is not implemented yet ")
     },
 
     renderCsv: function(block_idx, dataset, dataset_idx, query){
@@ -528,6 +567,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         var len = this.props.data[block_idx].datasets[dataset_idx].data.length;
         var limit = Math.min(rendered+500, len);
         var limit_item = this.limit_item(dsid);
+        var hlr_column = this.getRecordHighlightingColumn(block_idx);
 
         if (rendered == len){
             return;
@@ -537,7 +577,7 @@ var SqlDoc = React.createClass({displayName: "SqlDoc",
         for (var i = rendered; i<limit; i++){
             this.rendered_records[dsid] = this.rendered_records[dsid] + 1;
 
-            var row_html = this.renderStaticRecord(block_idx, dataset_idx, i);
+            var row_html = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column);
 
             insert_html += row_html;
         }
