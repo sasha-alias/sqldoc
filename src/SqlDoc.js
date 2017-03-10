@@ -1,6 +1,8 @@
 var React = require('react');
 var Marked = require('marked');
 var $ = require('jquery');
+var d3 = require("d3");
+var topojson = require("topojson");
 
 var formatValue = function(value){
     // escape html tags
@@ -35,9 +37,14 @@ var SqlDoc = React.createClass({
     },
 
     componentDidMount: function(){
-        React.findDOMNode(this).addEventListener('scroll', this.scrollHandler);
+        var dom_node = React.findDOMNode(this)
+        dom_node.addEventListener('scroll', this.scrollHandler);
         window.addEventListener('keydown', this.keyHandler);
         window.addEventListener('keyup', this.keyUpHandler);
+
+        if (this.mount_map){
+            this.mountMap(dom_node);
+        }
     },
 
     componentWillUnmount: function(){
@@ -269,14 +276,12 @@ var SqlDoc = React.createClass({
         } else {
             var hlr_column = null;
         }
-        console.log(hlr_column);
         return hlr_column;
     },
 
     renderTable: function(block_idx, dataset, dataset_idx, query){
 
         var dsid = this.dsid(block_idx, dataset_idx);
-
 
         if (dataset.resultStatus == 'PGRES_COMMAND_OK'){
             return <div key={'cmdres_'+dsid} className="alert alert-success">{dataset.cmdStatus}</div>;
@@ -376,8 +381,9 @@ var SqlDoc = React.createClass({
         var data = dataset.data;
         var header = [];
         var sidebar = [];
+        var values = {};
         var rows = {};
-        for (rn in data){
+        for (rn in data){ // detect all pairs
 
             var val1 = data[rn][0];
             var val2 = data[rn][1];
@@ -390,10 +396,23 @@ var SqlDoc = React.createClass({
                 sidebar.push(val1);
             }
 
-            if (!(val1 in rows)){
-                rows[val1] = [];
+            if (!(val1 in values)){
+                values[val1] = {};
             }
-            rows[val1].push(data[rn][2]);
+            values[val1][val2] = data[rn][2];
+        }
+
+        for (n in sidebar){ // fill missing pairs with nulls
+            var val1 = sidebar[n];
+            rows[val1] = {};
+            for (m in header){
+                var val2 = header[m];
+                if (val1 in values && val2 in values[val1]){
+                    rows[val1][val2] = values[val1][val2]
+                } else {
+                    rows[val1][val2] = null;
+                }
+            }
         }
 
         var header_html = [<td></td>];
@@ -424,6 +443,8 @@ var SqlDoc = React.createClass({
 
     renderMap: function(block_idx, dataset, dataset_idx, query){
         return <div className="error alert alert-danger"> map rendering is not implemented yet </div>
+        this.mount_map = true;
+        return <div/>
     },
 
     renderCsv: function(block_idx, dataset, dataset_idx, query){
@@ -634,8 +655,11 @@ var SqlDoc = React.createClass({
 
     adjustFloatingHeader: function(){
         console.log(this.floatingHeader().is(':visible'));
-    }
+    },
 
+    mountMap: function(dom_node){
+        // placeholder for future implementation
+    },
 
 });
 
