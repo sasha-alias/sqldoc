@@ -1,6 +1,6 @@
 {
   "name": "sqldoc",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "devDependencies": {
     "mocha": "^2.2.5"
   },
