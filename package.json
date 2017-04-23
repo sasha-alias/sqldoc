@@ -2,16 +2,21 @@
   "name": "sqldoc",
   "version": "0.6.1",
   "devDependencies": {
+    "babel": "^6.23.0",
+    "babel-cli": "^6.24.1",
+    "babel-plugin-transform-react-jsx": "^6.24.1",
     "mocha": "^2.2.5"
   },
   "dependencies": {
     "d3": "^3.5.0",
     "marked": "^0.3.3",
-    "react": "^0.13.3",
+    "react": "^0.14.9",
+    "react-dom": "^0.14.9",
     "topojson": "^2.2.0"
   },
   "main": "sqldoc.js",
   "scripts": {
-    "test": "node_modules/.bin/mocha"
+    "test": "node_modules/.bin/mocha",
+    "build:watch": "babel --plugins transform-react-jsx --out-dir=build src/ --watch"
   }
 }

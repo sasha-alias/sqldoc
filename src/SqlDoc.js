@@ -1,4 +1,5 @@
 var React = require('react');
+var ReactDOM = require('react-dom');
 var Marked = require('marked');
 var $ = require('jquery');
 var d3 = require("d3");
@@ -37,7 +38,7 @@ var SqlDoc = React.createClass({
     },
 
     componentDidMount: function(){
-        var dom_node = React.findDOMNode(this)
+        var dom_node = ReactDOM.findDOMNode(this)
         dom_node.addEventListener('scroll', this.scrollHandler);
         window.addEventListener('keydown', this.keyHandler);
         window.addEventListener('keyup', this.keyUpHandler);
@@ -48,7 +49,7 @@ var SqlDoc = React.createClass({
     },
 
     componentWillUnmount: function(){
-        React.findDOMNode(this).removeEventListener('scroll', this.scrollHandler);
+        ReactDOM.findDOMNode(this).removeEventListener('scroll', this.scrollHandler);
         window.removeEventListener('keydown', this.keyHandler);
         window.removeEventListener('keyup', this.keyUpHandler);
     },
@@ -507,7 +508,7 @@ var SqlDoc = React.createClass({
     },
 
     selectAll: function(){ // select content of entire output
-        node = React.findDOMNode(this);
+        node = ReactDOM.findDOMNode(this);
         var range = document.createRange();
         range.selectNodeContents(node);
         var sel = window.getSelection();
@@ -536,7 +537,7 @@ var SqlDoc = React.createClass({
     },
 
     scrollHandler: function(e){
-        var container = $(React.findDOMNode(this));
+        var container = $(ReactDOM.findDOMNode(this));
         for (var block_idx=0; block_idx < this.props.data.length; block_idx++){
             for (var dataset_idx=0; dataset_idx < this.props.data[block_idx].datasets.length; dataset_idx++){
 
