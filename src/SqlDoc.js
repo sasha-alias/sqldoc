@@ -224,6 +224,36 @@ var SqlDoc = React.createClass({
         );
     },
 
+    // for PG explain plan results parses the strings and adds information about cost to a dataset
+    mixinPGExplainPlan: function(block_idx, dataset, dataset_idx, query){
+
+        var getCost = function(record){
+            var cost = record.match(/cost=([^\s]*)/);
+            if (cost && cost.length > 0){
+                cost = cost[1].split('..');
+                if (cost && cost.length == 2){
+                    return cost;
+                }
+            }
+            return null
+        }
+
+        var summary_record = dataset.data[0][0];
+        var total_cost = getCost(summary_record);
+
+        console.log('total: '+total_cost);
+        dataset.data.forEach(function(item){
+            var cost_percentage = null;
+            var record = item[0];
+            var cost = getCost(record);
+            if (cost){
+                var cost_percentage = cost[1]/total_cost[1]*100;
+            }
+            item.cost_percentage = cost_percentage;
+        });
+
+    },
+
     limit_ref: function(dsid){
         return "limit_"+dsid;
     },
@@ -245,7 +275,13 @@ var SqlDoc = React.createClass({
                 if (val != null){
                     val = formatValue(val);
                 }
-                fields += '<td>'+val+'</td>';
+                if (row.cost_percentage && column_idx==0) { // render explain plan record
+                    var style = "background-image: -webkit-linear-gradient(left, rgba(115, 115, 115, 0.3), rgba(115, 115, 115, 0.3) "+row.cost_percentage+
+                        "%, transparent "+row.cost_percentage+"%, transparent 100%);";
+                    fields += '<td style="'+style+'">'+val+'</td>';
+                } else {
+                    fields += '<td>'+val+'</td>';
+                }
             }
         }
 
@@ -281,6 +317,12 @@ var SqlDoc = React.createClass({
     },
 
     renderTable: function(block_idx, dataset, dataset_idx, query){
+
+        var connector_type = this.props.data[block_idx].connector_type;
+        var is_explain = this.props.data[block_idx].datasets[dataset_idx].explain;
+        if (connector_type == "postgres" && is_explain){
+            this.mixinPGExplainPlan(block_idx, dataset, dataset_idx, query);
+        }
 
         var dsid = this.dsid(block_idx, dataset_idx);
 
