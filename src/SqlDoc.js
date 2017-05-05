@@ -4,6 +4,7 @@ var Marked = require('marked');
 var $ = require('jquery');
 var d3 = require("d3");
 var topojson = require("topojson");
+var PGPlanMixin = require("./pgplan");
 
 var formatValue = function(value){
     // escape html tags
@@ -34,7 +35,7 @@ var SqlDoc = React.createClass({
         this.floating_dsid = null;
         this.tables_headers = {};
         this.lastkeys = [0, 0]; // monitor for CMD+A for selection
-        return null;
+        return {data: this.props.data};
     },
 
     componentDidMount: function(){
@@ -115,6 +116,21 @@ var SqlDoc = React.createClass({
         return <div className="query-block"><pre>{query}</pre></div>;
     },
 
+    sortDataset: function(block_idx, dataset_idx, column_idx){
+
+        function compare(a, b) {
+            if (a[column_idx] < b[column_idx]) return -1;
+            if (a[column_idx] > b[column_idx]) return 1;
+            return 0;
+        }
+
+        var dataset_data = this.state.data[block_idx].datasets[dataset_idx].data.sort(compare);
+        var data = this.state.data;
+        data[block_idx].datasets[dataset_idx].data = dataset_data;
+
+        this.setState({data: data});
+    },
+
     render: function(){
 
         try {
@@ -128,20 +144,20 @@ var SqlDoc = React.createClass({
 
             // document blocks
             this.rendered_records = {};
-            for (var block_idx = 0; block_idx < this.props.data.length; block_idx++){
+            for (var block_idx = 0; block_idx < this.state.data.length; block_idx++){
 
-                duration += this.props.data[block_idx].duration;
+                duration += this.state.data[block_idx].duration;
 
-                var renderer = this.getRenderer(this.props.data[block_idx].query);
-                var datasets = this.props.data[block_idx].datasets.map(function(dataset, i){
+                var renderer = this.getRenderer(this.state.data[block_idx].query);
+                var datasets = this.state.data[block_idx].datasets.map(function(dataset, i){
                     var dsid = self.dsid(block_idx, i);
                     self.rendered_records[dsid] = 0;
-                    return renderer(block_idx, dataset, i, self.props.data[block_idx].query);
+                    return renderer(block_idx, dataset, i, self.state.data[block_idx].query);
                 });
 
-                var header = this.getHeader(this.props.data[block_idx].query);
-                var footer = this.getFooter(this.props.data[block_idx].query);
-                var block_query = this.getBlockQuery(this.props.data[block_idx].query);
+                var header = this.getHeader(this.state.data[block_idx].query);
+                var footer = this.getFooter(this.state.data[block_idx].query);
+                var block_query = this.getBlockQuery(this.state.data[block_idx].query);
 
                 block = <div key={"block_"+block_idx}>{block_query}{header}{datasets}{footer}</div>;
                 blocks.push(block);
@@ -224,36 +240,6 @@ var SqlDoc = React.createClass({
         );
     },
 
-    // for PG explain plan results parses the strings and adds information about cost to a dataset
-    mixinPGExplainPlan: function(block_idx, dataset, dataset_idx, query){
-
-        var getCost = function(record){
-            var cost = record.match(/cost=([^\s]*)/);
-            if (cost && cost.length > 0){
-                cost = cost[1].split('..');
-                if (cost && cost.length == 2){
-                    return cost;
-                }
-            }
-            return null
-        }
-
-        var summary_record = dataset.data[0][0];
-        var total_cost = getCost(summary_record);
-
-        console.log('total: '+total_cost);
-        dataset.data.forEach(function(item){
-            var cost_percentage = null;
-            var record = item[0];
-            var cost = getCost(record);
-            if (cost){
-                var cost_percentage = cost[1]/total_cost[1]*100;
-            }
-            item.cost_percentage = cost_percentage;
-        });
-
-    },
-
     limit_ref: function(dsid){
         return "limit_"+dsid;
     },
@@ -265,8 +251,11 @@ var SqlDoc = React.createClass({
     renderStaticRecord: function(block_idx, dataset_idx, record_idx, hlr_column){
         // generating text html is much faster than using react
 
+        var connector_type = this.state.data[block_idx].connector_type;
+        var is_explain = this.state.data[block_idx].datasets[dataset_idx].explain;
+
         var fields = '<td class="record-rownum">'+(record_idx+1)+'</td>';
-        var row = this.props.data[block_idx].datasets[dataset_idx].data[record_idx];
+        var row = this.state.data[block_idx].datasets[dataset_idx].data[record_idx];
         for (var column_idx=0; column_idx < row.length; column_idx++){
             if (column_idx == hlr_column-1){ // skip rendering record highligting column
                 continue;
@@ -275,11 +264,39 @@ var SqlDoc = React.createClass({
                 if (val != null){
                     val = formatValue(val);
                 }
-                if (row.cost_percentage && column_idx==0) { // render explain plan record
-                    var style = "background-image: -webkit-linear-gradient(left, rgba(115, 115, 115, 0.3), rgba(115, 115, 115, 0.3) "+row.cost_percentage+
-                        "%, transparent "+row.cost_percentage+"%, transparent 100%);";
-                    fields += '<td style="'+style+'">'+val+'</td>';
-                } else {
+
+                if (connector_type == "postgres" && is_explain && column_idx==0) { // render explain plan record
+
+                    if (row.time_percentage != null){
+                        var exclusive_percentage = row.time_percentage;
+                        var inclusive_percentage = row.inclusive_time_percentage;
+                    } else {
+                        var exclusive_percentage = row.cost_percentage;
+                        var inclusive_percentage = row.inclusive_cost_percentage;
+                    }
+                    var exclusive_color = "rgba(251, 2, 2, 0.4)";
+                    var inclusive_color = "rgba(251, 2, 2, 0.1)";
+                    var exclusive_gradient = exclusive_color+", "+exclusive_color+" "+exclusive_percentage+"%, ";
+                    var inclusive_gradient = inclusive_color+" "+exclusive_percentage+"%, "+inclusive_color+" "+inclusive_percentage+"%, ";
+                    var transparent_gradient = "transparent "+inclusive_percentage+"%, transparent 100%";
+
+                    var style = "background-image: -webkit-linear-gradient(left, "+exclusive_gradient+inclusive_gradient+transparent_gradient+");";
+
+                    // wrap explain plan nodes with span tag
+                    if (record_idx == 0){ // 1st row is always a node
+                        val = val.replace(/^([^(]*)/, '<span class="explain-plan-header-title">$1</span>'); // wrap header with span
+                        console.log(val);
+                    }
+                    val = val.replace(/(-&gt;)([^(]*)/, '<span class="explain-plan-node-arrow">-&gt;</span><span class="explain-plan-node-title">$2</span>'); // wrap arrow with span
+                    val = val.replace(/(\(.*)/, '<span class="explain-plan-details">$1</span>'); // everything starting from 1st bracket are details
+                    //
+                    if (val.match(/\(+/) != null){ // if at least one bracket
+                        fields += '<td style="'+style+'">'+val+'</td>';
+                    } else { // row without bracket is a details row
+                        fields += '<td style="'+style+'"><span class="explain-plan-details">'+val+'</span></td>';
+                    }
+
+                } else { // render usual record
                     fields += '<td>'+val+'</td>';
                 }
             }
@@ -305,7 +322,7 @@ var SqlDoc = React.createClass({
     getRecordHighlightingColumn: function(block_idx){
         // record highlighting column is the `hlr=N` parameter defining the column number which is responsible for record highlighting
 
-        var query = this.props.data[block_idx].query;
+        var query = this.state.data[block_idx].query;
 
         var hlr_column = query.match("\\s*hlr\\s*=\\s*([0-9]*)");
         if (hlr_column != null && hlr_column.length > 0){
@@ -317,11 +334,12 @@ var SqlDoc = React.createClass({
     },
 
     renderTable: function(block_idx, dataset, dataset_idx, query){
+        var self = this;
 
-        var connector_type = this.props.data[block_idx].connector_type;
-        var is_explain = this.props.data[block_idx].datasets[dataset_idx].explain;
+        var connector_type = this.state.data[block_idx].connector_type;
+        var is_explain = this.state.data[block_idx].datasets[dataset_idx].explain;
         if (connector_type == "postgres" && is_explain){
-            this.mixinPGExplainPlan(block_idx, dataset, dataset_idx, query);
+            PGPlanMixin(dataset.data);
         }
 
         var dsid = this.dsid(block_idx, dataset_idx);
@@ -347,7 +365,10 @@ var SqlDoc = React.createClass({
         if (fields){
             var out_fields = fields.map(function(field, i){
                 if (i != hlr_column-1){ // skip record highlighting column
-                    return (<th key={'field_'+i}>{field.name}</th>);
+                    var sortFunction = function(){
+                        self.sortDataset(block_idx, dataset_idx, i);
+                    };
+                    return (<th className="table-column-header" onClick={sortFunction} key={'field_'+i}>{field.name}</th>);
                 }
             });
             out_fields.unshift(<th>#</th>);
@@ -580,8 +601,8 @@ var SqlDoc = React.createClass({
 
     scrollHandler: function(e){
         var container = $(ReactDOM.findDOMNode(this));
-        for (var block_idx=0; block_idx < this.props.data.length; block_idx++){
-            for (var dataset_idx=0; dataset_idx < this.props.data[block_idx].datasets.length; dataset_idx++){
+        for (var block_idx=0; block_idx < this.state.data.length; block_idx++){
+            for (var dataset_idx=0; dataset_idx < this.state.data[block_idx].datasets.length; dataset_idx++){
 
                 var dsid = this.dsid(block_idx, dataset_idx);
 
@@ -606,7 +627,7 @@ var SqlDoc = React.createClass({
 
                 // render more records if needed
                 var rendered = this.rendered_records[dsid];
-                var len = this.props.data[block_idx].datasets[dataset_idx].data.length;
+                var len = this.state.data[block_idx].datasets[dataset_idx].data.length;
                 if (rendered == len){
                     continue;
                 }
@@ -628,7 +649,7 @@ var SqlDoc = React.createClass({
     renderNext: function(block_idx, dataset_idx){
         var dsid = this.dsid(block_idx, dataset_idx);
         var rendered = this.rendered_records[dsid];
-        var len = this.props.data[block_idx].datasets[dataset_idx].data.length;
+        var len = this.state.data[block_idx].datasets[dataset_idx].data.length;
         var limit = Math.min(rendered+500, len);
         var limit_item = this.limit_item(dsid);
         var hlr_column = this.getRecordHighlightingColumn(block_idx);
