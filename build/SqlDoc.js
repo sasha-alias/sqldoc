@@ -4,7 +4,8 @@ var Marked = require('marked');
 var $ = require('jquery');
 var d3 = require("d3");
 var topojson = require("topojson");
-var PGPlanMixin = require("./pgplan");
+var PGPlan = require("./pgplan").PGPlan;
+var PGPlanNodes = require("./pgplan").PGPlanNodes;
 
 var formatValue = function (value) {
     // escape html tags
@@ -130,15 +131,36 @@ var SqlDoc = React.createClass({
 
     sortDataset: function (block_idx, dataset_idx, column_idx) {
 
-        function compare(a, b) {
+        function compareAsc(a, b) {
             if (a[column_idx] < b[column_idx]) return -1;
             if (a[column_idx] > b[column_idx]) return 1;
             return 0;
         }
+        function compareDesc(a, b) {
+            if (a[column_idx] < b[column_idx]) return 1;
+            if (a[column_idx] > b[column_idx]) return -1;
+            return 0;
+        }
 
-        var dataset_data = this.state.data[block_idx].datasets[dataset_idx].data.sort(compare);
+        var dataset = this.state.data[block_idx].datasets[dataset_idx];
+
+        // cleanup sort order of other columns
+        dataset.fields.forEach(function (field, idx) {
+            if (idx != column_idx) {
+                field.sort = null;
+            }
+        });
+        if (dataset.fields[column_idx].sort == "asc") {
+            dataset.fields[column_idx].sort = "desc";
+            var compare = compareDesc;
+        } else {
+            dataset.fields[column_idx].sort = "asc";
+            var compare = compareAsc;
+        }
+
+        dataset.data = dataset.data.sort(compare);
         var data = this.state.data;
-        data[block_idx].datasets[dataset_idx].data = dataset_data;
+        data[block_idx].datasets[dataset_idx] = dataset;
 
         this.setState({ data: data });
     },
@@ -311,7 +333,6 @@ var SqlDoc = React.createClass({
         // generating text html is much faster than using react
 
         var connector_type = this.state.data[block_idx].connector_type;
-        var is_explain = this.state.data[block_idx].datasets[dataset_idx].explain;
 
         var fields = '<td class="record-rownum">' + (record_idx + 1) + '</td>';
         var row = this.state.data[block_idx].datasets[dataset_idx].data[record_idx];
@@ -324,45 +345,7 @@ var SqlDoc = React.createClass({
                 if (val != null) {
                     val = formatValue(val);
                 }
-
-                if (connector_type == "postgres" && is_explain && column_idx == 0) {
-                    // render explain plan record
-
-                    if (row.time_percentage != null) {
-                        var exclusive_percentage = row.time_percentage;
-                        var inclusive_percentage = row.inclusive_time_percentage;
-                    } else {
-                        var exclusive_percentage = row.cost_percentage;
-                        var inclusive_percentage = row.inclusive_cost_percentage;
-                    }
-                    var exclusive_color = "rgba(251, 2, 2, 0.4)";
-                    var inclusive_color = "rgba(251, 2, 2, 0.1)";
-                    var exclusive_gradient = exclusive_color + ", " + exclusive_color + " " + exclusive_percentage + "%, ";
-                    var inclusive_gradient = inclusive_color + " " + exclusive_percentage + "%, " + inclusive_color + " " + inclusive_percentage + "%, ";
-                    var transparent_gradient = "transparent " + inclusive_percentage + "%, transparent 100%";
-
-                    var style = "background-image: -webkit-linear-gradient(left, " + exclusive_gradient + inclusive_gradient + transparent_gradient + ");";
-
-                    // wrap explain plan nodes with span tag
-                    if (record_idx == 0) {
-                        // 1st row is always a node
-                        val = val.replace(/^([^(]*)/, '<span class="explain-plan-header-title">$1</span>'); // wrap header with span
-                        console.log(val);
-                    }
-                    val = val.replace(/(-&gt;)([^(]*)/, '<span class="explain-plan-node-arrow">-&gt;</span><span class="explain-plan-node-title">$2</span>'); // wrap arrow with span
-                    val = val.replace(/(\(.*)/, '<span class="explain-plan-details">$1</span>'); // everything starting from 1st bracket are details
-                    //
-                    if (val.match(/\(+/) != null) {
-                        // if at least one bracket
-                        fields += '<td style="' + style + '">' + val + '</td>';
-                    } else {
-                        // row without bracket is a details row
-                        fields += '<td style="' + style + '"><span class="explain-plan-details">' + val + '</span></td>';
-                    }
-                } else {
-                    // render usual record
-                    fields += '<td>' + val + '</td>';
-                }
+                fields += '<td>' + val + '</td>';
             }
         }
 
@@ -403,7 +386,11 @@ var SqlDoc = React.createClass({
         var connector_type = this.state.data[block_idx].connector_type;
         var is_explain = this.state.data[block_idx].datasets[dataset_idx].explain;
         if (connector_type == "postgres" && is_explain) {
-            PGPlanMixin(dataset.data);
+            var pgplan_nodes = PGPlanNodes(dataset.data.slice());
+            if (pgplan_nodes[0].cost != null) {
+                // if pgplan detected properly it has cost, so render it, otherwise fallback to default renderer
+                return React.createElement(PGPlan, { nodes: pgplan_nodes });
+            }
         }
 
         var dsid = this.dsid(block_idx, dataset_idx);
@@ -438,17 +425,34 @@ var SqlDoc = React.createClass({
             return null;
         }
 
+        // columns headers
         if (fields) {
             var out_fields = fields.map(function (field, i) {
                 if (i != hlr_column - 1) {
                     // skip record highlighting column
+
                     var sortFunction = function () {
                         self.sortDataset(block_idx, dataset_idx, i);
                     };
+
+                    if (field.sort == "asc") {
+                        var sort_style = "table-column-sorted-asc";
+                    } else if (field.sort == "desc") {
+                        var sort_style = "table-column-sorted-desc";
+                    } else {
+                        var sort_style = "table-column-sorted-none";
+                    }
+
                     return React.createElement(
                         'th',
-                        { className: 'table-column-header', onClick: sortFunction, key: 'field_' + i },
-                        field.name
+                        { key: 'field_' + i },
+                        React.createElement(
+                            'span',
+                            { className: "table-column-header " + sort_style, onClick: sortFunction },
+                            ' ',
+                            field.name,
+                            ' '
+                        )
                     );
                 }
             });
