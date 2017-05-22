@@ -1,6 +1,6 @@
 {
   "name": "sqldoc",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "devDependencies": {
     "babel": "^6.23.0",
     "babel-cli": "^6.24.1",
