@@ -415,16 +415,6 @@ var PGPlan = React.createClass({
                 'td',
                 { style: { backgroundImage: style } },
                 val
-            ),
-            React.createElement(
-                'td',
-                null,
-                inclusive_percentage
-            ),
-            React.createElement(
-                'td',
-                null,
-                exclusive_percentage
             )
         );
     },
