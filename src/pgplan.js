@@ -116,16 +116,10 @@ var Node = function(rn, text){
 
     this.deductCost = function(cost){
         self.deducted_cost = self.deducted_cost - cost;
-        //if (self.parent_node != null){
-        //    self.parent_node.deductCost(cost);
-        //}
     };
 
     this.deductTime = function(time){
         self.deducted_time = self.deducted_time - time;
-        //if (self.parent_node != null){
-        //    self.parent_node.deductTime(time);
-        //}
     };
 
     this.hideSwitchChildren = function(is_hidden){
@@ -142,9 +136,9 @@ var Node = function(rn, text){
 }
 
 var PGPlanNodes = function (records){
+
     var nodes = [];
     var ctes = [];
-    var current_parrent = 0;
 
     var getParent = function(node){
         var ret = null;
@@ -168,14 +162,28 @@ var PGPlanNodes = function (records){
     });
 
     // Deduct CTE cost/time
-    // during parsing CTEs linked to the root, so we need deduct the cost/time of CTEs from the CTE Scans separately
     ctes.forEach(function(ctenode){
-        nodes.forEach(function(node){
-            if (node.parent_cte == ctenode.cte_id){
-                node.deductCost(ctenode.kids[0].cost);
-                node.deductTime(ctenode.kids[0].time);
+
+        var deductCte = function(deducted_node, ctenode){
+            if (ctenode.kids[0].cost){
+                deducted_node.deductCost(ctenode.kids[0].cost[1]);
             }
-        })
+            if (ctenode.kids[0].time){
+                deducted_node.deductTime(ctenode.kids[0].time[1]);
+            }
+        }
+
+        // CTE Scan includes the cost of CTE, so needs to be deducted
+        nodes.forEach(function(node){
+            if (node.parent_cte == ctenode.cte_id){ // cte scan node
+                deductCte(node, ctenode);
+            }
+        });
+
+        // if parent node of CTE is not CTE Scan, then deduct CTE cost from it
+        if (ctenode.parent_node.parent_cte == null){
+            deductCte(ctenode.parent_node, ctenode);
+        }
     });
 
     // replace records with nodes objects
