@@ -65,7 +65,7 @@ var Node = function (rn, text) {
         } else {
             // row without bracket is a details row
             self.node_description = null;
-            self.node_details = self.text;
+            self.node_details = self.text.match(/^[\s]*(.*)/)[1];
         }
         // collapsiblle nodes are started from "->", "InitPlan", "SubPlan"
         self.collapsible = self.text.match(/\s*->/) === null ? false : true;
@@ -80,7 +80,7 @@ var Node = function (rn, text) {
             self.cte = true;
             self.collapsible = true;
             self.subplan = true;
-            self.node_description = self.text;
+            self.node_description = self.text.match(/^[\s]*(.*)/)[1];
             self.node_details = null;
             self.cte_id = self.text.match(/\s*CTE ([^\s]*)/)[1];
         }
@@ -164,6 +164,9 @@ var PGPlanNodes = function (records) {
     ctes.forEach(function (ctenode) {
 
         var deductCte = function (deducted_node, ctenode) {
+            if (ctenode.kids.length < 1) {
+                return;
+            }
             if (ctenode.kids[0].cost) {
                 deducted_node.deductCost(ctenode.kids[0].cost[1]);
             }
@@ -339,6 +342,7 @@ var PGPlan = React.createClass({
             );
             if (record.collapsible && !record.subplan) {
                 var record_style = "explain-plan-collapsible-record";
+
                 if (record.collapsed) {
                     var collapse_icon = "glyphicon-circle-arrow-up";
                     var collapse_note = "[subtree skipped]";
@@ -364,6 +368,11 @@ var PGPlan = React.createClass({
                 var collapse = null;
                 var collapse_note = null;
             }
+
+            if (record.cte) {
+                var record_style = "explain-plan-cte-record";
+            }
+            ///////
 
             if (this.state.highlight) {
                 var val = React.createElement(
