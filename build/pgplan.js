@@ -11,9 +11,11 @@ var Node = function (rn, text) {
     this.parent_node = null;
     this.kids = [];
     this.cost = null;
-    this.deducted_cost = null;
+    this.exclusive_cost = null;
     this.time = null;
-    this.deducted_time = null;
+    this.loops = null;
+    this.inclusive_time = null;
+    this.exclusive_time = null;
     this.subplan = false;
     this.cte = false;
     this.cte_id = null;
@@ -23,8 +25,6 @@ var Node = function (rn, text) {
     // d3 related
     this.name = rn;
     this.value = 10;
-    this.type = "red";
-    this.node_level = "red";
     this.parent = null;
     //
 
@@ -41,20 +41,15 @@ var Node = function (rn, text) {
 
     this.parseText = function () {
         self.cost = self.parseParam(/cost=([^\s]*)/);
-        self.deducted_cost = self.cost ? self.cost[1] : null;
+        self.exclusive_cost = self.cost ? self.cost[1] : null;
         self.time = self.parseParam(/actual time=([^\s]*)/);
-        self.deducted_time = self.time ? self.time[1] : null;
-        var level = self.text.match(/^[\s]*->/);
-        if (self.rn == 0) {
-            // root node
-            self.node_level = 0;
-        } else if (level != null && level.length > 0) {
-            // plan node
-            self.node_level = level[0].length - 2;
-        } else {
-            // details node
-            self.node_level = self.text.match(/^[\s]*/)[0].length;
-        }
+
+        var loops = self.text.match(/loops=([0-9]*)/);
+        loops = loops ? loops[1] : null;
+        self.loops = loops;
+
+        self.inclusive_time = self.time ? self.time[1] * self.loops : null;
+        self.exclusive_time = self.inclusive_time;
 
         self.never_executed = self.text.match(/\(never executed\)/) != null;
 
@@ -69,10 +64,12 @@ var Node = function (rn, text) {
         }
         // collapsiblle nodes are started from "->", "InitPlan", "SubPlan"
         self.collapsible = self.text.match(/\s*->/) === null ? false : true;
-        if (self.text.match(/\s*InitPlan/) != null || self.text.match(/\s*SubPlan/) != null) {
+
+        if (self.text.match(/^[\s]*InitPlan/) != null || self.text.match(/^[\s]*SubPlan/) != null) {
             self.subplan = true;
             self.collapsible = true;
-            self.node_description = self.text;
+            self.node_description = self.text.trim();
+            self.node_details = null;
         }
 
         // detect CTE
@@ -89,6 +86,19 @@ var Node = function (rn, text) {
         if (self.text.match(/\s*CTE Scan/) != null) {
             self.parent_cte = self.text.match(/\s*CTE Scan on ([^\s]*)/)[1];
         }
+
+        // detect level
+        var level = self.text.match(/^[\s]*->/);
+        if (self.rn == 0) {
+            // root node
+            self.node_level = 0;
+        } else if (level != null && level.length > 0) {
+            // plan node
+            self.node_level = level[0].length - 2;
+        } else {
+            // details node
+            self.node_level = self.text.match(/^[\s]*/)[0].length;
+        }
     };
 
     this.setParent = function (parent_node) {
@@ -104,8 +114,8 @@ var Node = function (rn, text) {
         if (parent_node != null && self.cost != null) {
             self.parent_node.deductCost(self.cost[1]);
         }
-        if (parent_node != null && self.time != null) {
-            self.parent_node.deductTime(self.time[1]);
+        if (parent_node != null && self.exclusive_time != null) {
+            self.parent_node.deductTime(self.inclusive_time);
         }
     };
 
@@ -114,11 +124,11 @@ var Node = function (rn, text) {
     };
 
     this.deductCost = function (cost) {
-        self.deducted_cost = self.deducted_cost - cost;
+        self.exclusive_cost = self.exclusive_cost - cost;
     };
 
     this.deductTime = function (time) {
-        self.deducted_time = self.deducted_time - time;
+        self.exclusive_time = self.exclusive_time - time;
     };
 
     this.hideSwitchChildren = function (is_hidden) {
@@ -138,6 +148,7 @@ var PGPlanNodes = function (records) {
 
     var nodes = [];
     var ctes = [];
+    var subplans = [];
 
     var getParent = function (node) {
         var ret = null;
@@ -158,22 +169,25 @@ var PGPlanNodes = function (records) {
         if (node.cte) {
             ctes.push(node);
         }
+        if (node.subplan && !node.cte) {
+            subplans.push(node);
+        }
     });
 
-    // Deduct CTE cost/time
-    ctes.forEach(function (ctenode) {
+    var deductCte = function (deducted_node, subtrahend) {
+        if (subtrahend.kids.length < 1) {
+            return;
+        }
+        if (subtrahend.kids[0].cost) {
+            deducted_node.deductCost(subtrahend.kids[0].cost[1]);
+        }
+        if (subtrahend.kids[0].inclusive_time) {
+            deducted_node.deductTime(subtrahend.kids[0].inclusive_time);
+        }
+    };
 
-        var deductCte = function (deducted_node, ctenode) {
-            if (ctenode.kids.length < 1) {
-                return;
-            }
-            if (ctenode.kids[0].cost) {
-                deducted_node.deductCost(ctenode.kids[0].cost[1]);
-            }
-            if (ctenode.kids[0].time) {
-                deducted_node.deductTime(ctenode.kids[0].time[1]);
-            }
-        };
+    // Deduct CTE and SubPlan cost/time
+    ctes.forEach(function (ctenode) {
 
         // CTE Scan includes the cost of CTE, so needs to be deducted
         nodes.forEach(function (node) {
@@ -189,6 +203,12 @@ var PGPlanNodes = function (records) {
         }
     });
 
+    subplans.forEach(function (subplan_node) {
+        if (subplan_node.parent_node != null) {
+            deductCte(subplan_node.parent_node, subplan_node);
+        }
+    });
+
     // replace records with nodes objects
     nodes.forEach(function (node, idx) {
         records[idx] = node;
@@ -197,16 +217,15 @@ var PGPlanNodes = function (records) {
     // calculate cost/time percentage for each node and parse the details about the nodes
     var summary_record = records[0];
     var total_cost = summary_record.cost ? summary_record.cost[1] : null;
-    var total_time = summary_record.time ? summary_record.time[1] : null;
+    var total_time = summary_record.inclusive_time;
 
     records.forEach(function (record, idx) {
-        var deducted_cost = record.deducted_cost ? record.deducted_cost : null;
-        var deducted_time = record.deducted_time ? record.deducted_time : null;
+        var exclusive_cost = record.exclusive_cost ? record.exclusive_cost : null;
 
         var inclusive_cost_percentage = record.cost ? record.cost[1] / total_cost * 100 : null;
-        var inclusive_time_percentage = record.time ? record.time[1] / total_time * 100 : null;
-        var cost_percentage = deducted_cost ? deducted_cost / total_cost * 100 : null;
-        var time_percentage = deducted_time ? deducted_time / total_time * 100 : null;
+        var inclusive_time_percentage = record.time ? record.time[1] * record.loops / total_time * 100 : null;
+        var cost_percentage = exclusive_cost ? exclusive_cost / total_cost * 100 : null;
+        var time_percentage = record.exclusive_time ? record.exclusive_time / total_time * 100 : null;
 
         var val = record[0];
 
@@ -426,6 +445,9 @@ var PGPlan = React.createClass({
                 val
             )
         );
+        //<td> {record.inclusive_time} </td>
+        //<td> {record.exclusive_time} </td>
+        //<td> {record.time_percentage} % </td>
     },
 
     render: function () {
@@ -519,14 +541,14 @@ var PGPlan = React.createClass({
     zoomIn: function () {
         this.setState({ viewport_size: {
                 width: this.state.viewport_size.width + 100,
-                height: this.state.viewport_size.height + 100
+                height: this.state.viewport_size.height + 200
             } });
     },
 
     zoomOut: function () {
         this.setState({ viewport_size: {
                 width: this.state.viewport_size.width - 100,
-                height: this.state.viewport_size.height - 100
+                height: this.state.viewport_size.height - 200
             } });
     },
 
@@ -545,7 +567,7 @@ var PGPlan = React.createClass({
         var treeData = [this.state.data[0]];
 
         // Generate the tree diagram
-        var margin = { top: 20, right: 120, bottom: 20, left: 180 },
+        var margin = { top: 20, right: 120, bottom: 20, left: 220 },
             width = self.state.viewport_size.width - margin.right - margin.left,
             height = self.state.viewport_size.height - margin.top - margin.bottom;
 
