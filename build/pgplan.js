@@ -297,7 +297,7 @@ var PGPlan = React.createClass({
         this.setState({ highlight: !this.state.highlight });
     },
 
-    renderRecord(record, idx) {
+    renderRecord: function (record, idx) {
 
         var self = this;
 
