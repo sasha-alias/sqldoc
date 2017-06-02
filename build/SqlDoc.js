@@ -1,11 +1,31 @@
-var React = require('react');
-var ReactDOM = require('react-dom');
-var Marked = require('marked');
-var $ = require('jquery');
-var d3 = require("d3");
-var topojson = require("topojson");
-var PGPlan = require("./pgplan").PGPlan;
-var PGPlanNodes = require("./pgplan").PGPlanNodes;
+function isElectron() {
+    if (typeof window != "undefined") {
+        return window && window.process && window.process.type;
+    } else {
+        return true; // this means actually NodeJS context, but behaviour should be similar as for electron so `true`
+    }
+}
+
+if (isElectron()) {
+    var React = require('react');
+    var ReactDOM = require('react-dom');
+    var Marked = require('marked');
+    var $ = require('jquery');
+    var d3 = require("d3");
+    var topojson = require("topojson");
+    var PGPlan = require("./pgplan").PGPlan;
+    var PGPlanNodes = require("./pgplan").PGPlanNodes;
+    var DataTypes = require("./datatypes");
+}
+
+function openExternal(url) {
+    if (isElectron()) {
+        var shell = require('electron').shell;
+        shell.openExternal(url);
+    } else {
+        window.open(url);
+    }
+}
 
 var formatValue = function (value) {
     // escape html tags
@@ -39,7 +59,10 @@ var SqlDoc = React.createClass({
         this.floating_dsid = null;
         this.tables_headers = {};
         this.lastkeys = [0, 0]; // monitor for CMD+A for selection
-        return { data: this.props.data };
+        return {
+            data: this.props.data,
+            show_datatypes: false
+        };
     },
 
     componentDidMount: function () {
@@ -51,6 +74,11 @@ var SqlDoc = React.createClass({
         if (this.mount_map) {
             this.mountMap(dom_node);
         }
+        this.mount_charts();
+    },
+
+    componentDidUpdate: function () {
+        mount_charts();
     },
 
     componentWillUnmount: function () {
@@ -130,19 +158,33 @@ var SqlDoc = React.createClass({
     },
 
     sortDataset: function (block_idx, dataset_idx, column_idx) {
+        var dataset = this.state.data[block_idx].datasets[dataset_idx];
+        var field_type = dataset.fields[column_idx].type;
 
         function compareAsc(a, b) {
-            if (a[column_idx] < b[column_idx]) return -1;
-            if (a[column_idx] > b[column_idx]) return 1;
+            if (DataTypes.isNumeric(field_type)) {
+                var aval = Number(a[column_idx]);
+                var bval = Number(b[column_idx]);
+            } else {
+                var aval = a[column_idx];
+                var bval = b[column_idx];
+            }
+            if (aval < bval) return -1;
+            if (aval > bval) return 1;
             return 0;
         }
         function compareDesc(a, b) {
-            if (a[column_idx] < b[column_idx]) return 1;
-            if (a[column_idx] > b[column_idx]) return -1;
+            if (DataTypes.isNumeric(field_type)) {
+                var aval = Number(a[column_idx]);
+                var bval = Number(b[column_idx]);
+            } else {
+                var aval = a[column_idx];
+                var bval = b[column_idx];
+            }
+            if (aval < bval) return 1;
+            if (aval > bval) return -1;
             return 0;
         }
-
-        var dataset = this.state.data[block_idx].datasets[dataset_idx];
 
         // cleanup sort order of other columns
         dataset.fields.forEach(function (field, idx) {
@@ -333,9 +375,9 @@ var SqlDoc = React.createClass({
         // generating text html is much faster than using react
 
         var connector_type = this.state.data[block_idx].connector_type;
-
+        var dataset = this.state.data[block_idx].datasets[dataset_idx];
         var fields = '<td class="record-rownum">' + (record_idx + 1) + '</td>';
-        var row = this.state.data[block_idx].datasets[dataset_idx].data[record_idx];
+        var row = dataset.data[record_idx];
         for (var column_idx = 0; column_idx < row.length; column_idx++) {
             if (column_idx == hlr_column - 1) {
                 // skip rendering record highligting column
@@ -345,7 +387,14 @@ var SqlDoc = React.createClass({
                 if (val != null) {
                     val = formatValue(val);
                 }
-                fields += '<td>' + val + '</td>';
+                var field_type = dataset.fields[column_idx].type;
+
+                console.log(field_type);
+                if (DataTypes.isNumeric(field_type)) {
+                    fields += '<td class="record-numeric-cell">' + val + '</td>';
+                } else {
+                    fields += '<td>' + val + '</td>';
+                }
             }
         }
 
@@ -443,6 +492,17 @@ var SqlDoc = React.createClass({
                         var sort_style = "table-column-sorted-none";
                     }
 
+                    if (self.state.show_datatypes) {
+                        var datatype = React.createElement(
+                            'span',
+                            { className: 'table-column-header-datatype' },
+                            React.createElement('br', null),
+                            field.type
+                        );
+                    } else {
+                        var datatype = null;
+                    }
+
                     return React.createElement(
                         'th',
                         { key: 'field_' + i },
@@ -451,14 +511,18 @@ var SqlDoc = React.createClass({
                             { className: "table-column-header " + sort_style, onClick: sortFunction },
                             ' ',
                             field.name,
-                            ' '
+                            ' ',
+                            datatype
                         )
                     );
                 }
             });
+
             out_fields.unshift(React.createElement(
                 'th',
-                null,
+                { className: 'table-column-header', onClick: function () {
+                        self.setState({ show_datatypes: !self.state.show_datatypes });
+                    } },
                 '#'
             ));
 
@@ -906,8 +970,222 @@ var SqlDoc = React.createClass({
 
     mountMap: function (dom_node) {
         // placeholder for future implementation
+    },
+
+    mount_charts() {
+
+        var self = this;
+
+        $("input[type=hidden]").each(function (idx, item) {
+            var chart_id = item.id.substr(5);
+            var dataset = JSON.parse(decodeURIComponent(item.value));
+
+            var chart_div = $("div[data-chart-id='" + chart_id + "']")[0];
+
+            var chart_type = $("div[data-chart-id='" + chart_id + "']").attr('data-chart-type');
+
+            var chart_args = $("div[data-chart-id='" + chart_id + "']").attr('data-chart-args');
+
+            var chart_arg_x = chart_args.match("\\s*x\\s*=\\s*([A-z0-9_]*)");
+            if (chart_arg_x != null && chart_arg_x.length > 0) {
+                chart_arg_x = chart_arg_x[1];
+            }
+
+            var pivot = chart_args.match("\\s*pivot\\s*");
+
+            var fields = dataset.fields.map(function (field, i) {
+                return field.name;
+            });
+
+            var data = {};
+
+            var column_charts = ['line', 'spline', 'area', 'step', 'area-spline', 'area-step', 'bar', 'scatter'];
+            var row_charts = ['pie', 'donut', 'gauge', 'bubble'];
+
+            if (column_charts.indexOf(chart_type) != -1) {
+                // field name as a header
+                var rows = dataset.data;
+                rows.unshift(fields);
+
+                data = {
+                    rows: rows,
+                    type: chart_type
+                };
+
+                if (pivot) {
+                    data.rows = pivotTable(dataset);
+                    chart_arg_x = 1; // in pivot charts first column is always at axis X
+                }
+
+                if (chart_arg_x) {
+
+                    var xfield = dataset.fields[chart_arg_x - 1];
+                    if (xfield) {
+
+                        data.x = xfield.name;
+
+                        if (['DATE', 'Date'].indexOf(xfield.type) > -1) {
+                            var axis = {
+                                x: {
+                                    type: 'timeseries',
+                                    tick: {
+                                        format: '%Y-%m-%d'
+                                    }
+                                }
+                            };
+                        }
+
+                        if (['TIMESTAMPTZ'].indexOf(xfield.type) > -1) {
+                            var axis = {
+                                x: {
+                                    type: 'timeseries',
+                                    tick: {
+                                        format: '%Y-%m-%d %H:%M:%S.%L%Z'
+                                    }
+                                }
+                            };
+                            // transform timestamp format to the one edible by d3
+                            for (var i = 1; i < data.rows.length; i++) {
+                                data.rows[i][chart_arg_x - 1] = data.rows[i][chart_arg_x - 1].replace(/(\.[0-9]{3})([0-9]*)(\+[0-9]{2}$)/g, '$1$300');
+                            }
+
+                            data.xFormat = '%Y-%m-%d %H:%M:%S.%L%Z';
+                        }
+
+                        if (['TIMESTAMP', 'DATETIME', 'DateTime', 'DateTime2'].indexOf(xfield.type) > -1) {
+                            var axis = {
+                                x: {
+                                    type: 'timeseries',
+                                    tick: {
+                                        format: '%Y-%m-%d %H:%M:%S.%L'
+                                    }
+                                }
+                            };
+                            // transform timestamp format to the one edible by d3
+                            for (var i = 1; i < data.rows.length; i++) {
+                                data.rows[i][chart_arg_x - 1] = data.rows[i][chart_arg_x - 1].replace(/(\.[0-9]{3})([0-9]*)$/g, '$1');
+                            }
+
+                            data.xFormat = '%Y-%m-%d %H:%M:%S.%L';
+                        }
+                    }
+                }
+            } else if (row_charts.indexOf(chart_type) != -1) {
+                // first column value as a header
+                if (chart_type == "bubble") {
+                    // bubble chart is implemented not with c3
+                    return self.mount_bubble_chart(chart_id, dataset);
+                }
+                if (chart_type == "tree") {
+                    // tree chart is implemented not with c3
+                    return mount_tree_chart(chart_id, dataset);
+                }
+
+                var columns = dataset.data;
+                data = {
+                    columns: columns,
+                    type: chart_type
+                };
+            } else {
+                var _div = $("div[data-chart-id='" + chart_id + "']");
+                _div.html('<div class="connection-error alert alert-danger">Chart ' + chart_type + ' is not supported<div>');
+                return;
+            }
+
+            try {
+                var chart = c3.generate({
+                    bindto: chart_div,
+                    data: data,
+                    axis: axis
+                });
+            } catch (err) {
+                var _div = $("div[data-chart-id='" + chart_id + "']");
+                _div.html('<div class="connection-error alert alert-danger">Chart building error: ' + err + '<div>');
+                console.log(err);
+                return;
+            }
+        });
+    },
+
+    mount_bubble_chart(chart_id, dataset) {
+
+        if (d3.select("[data-chart-id='" + chart_id + "']").attr("mounted")) {
+            // don't mount if already mounted
+            return;
+        }
+        console.log(d3.select("[data-chart-id='" + chart_id + "']").attr("mounted", "true")); // mark as mounted
+
+        var display_selected_name = d3.select("[data-chart-id='" + chart_id + "']").append("div").attr("class", "bubble-chart-selected-name").html("&nbsp;");
+
+        var display_selected_value = d3.select("[data-chart-id='" + chart_id + "']").append("div").attr("class", "bubble-chart-selected-value").html("&nbsp;");
+
+        var diameter = 500,
+            //max size of the bubbles
+        color = d3.scale.category20b(); //color category
+
+        var bubble = d3.layout.pack().sort(null).size([diameter, diameter]).padding(1.5);
+
+        var svg = d3.select("[data-chart-id='" + chart_id + "']").append("svg:svg").attr("width", "100%").attr("height", 500).attr("class", "bubble");
+
+        var data = dataset.data;
+        // convert list of lists to list of dicts
+        data = data.map(function (d) {
+            return { name: d[0], value: d[1] };
+        });
+
+        // keep only leaf nodes
+        var nodes = bubble.nodes({ children: data }).filter(function (d) {
+            return !d.children;
+        });
+
+        //setup the chart
+        var bubbles = svg.append("g").attr("transform", "translate(0,0)").selectAll(".bubble").data(nodes).enter();
+
+        var tooltip = d3.select("[data-chart-id='" + chart_id + "']").append("div").attr("class", "bubbles-tooltip").text("tooltip");
+
+        //create the bubbles
+        bubbles.append("circle").attr("r", function (d) {
+            return d.r;
+        }).attr("cx", function (d) {
+            return d.x;
+        }).attr("cy", function (d) {
+            return d.y;
+        }).style("fill", function (d) {
+            return color(d.value);
+        }).on("mouseover", function (d) {
+            tooltip.text(d.name + ": " + d.value);
+            tooltip.style("visibility", "visible");
+        }).on("mousemove", function () {
+            return tooltip.style("top", d3.event.pageY - 10 + "px").style("left", d3.event.pageX + 10 + "px");
+        }).on("mouseout", function () {
+            return tooltip.style("visibility", "hidden");
+        }).on("click", function (d) {
+            display_selected_name.text(dataset.fields[0].name + ": " + d.name);
+            display_selected_value.text(dataset.fields[1].name + ": " + d.value);
+        });
+
+        //format the text for each bubble
+        bubbles.append("text").attr("x", function (d) {
+            return d.x;
+        }).attr("y", function (d) {
+            return d.y + 5;
+        }).attr("text-anchor", "middle").text(function (d) {
+            // display text only if it fits into the bubble (calculation is very dumb)
+            var text_width = d.name.length * 12;
+            if (text_width < d.r * 2) {
+                return d.name;
+            }
+        }).style({
+            "fill": "white",
+            "font-family": "Helvetica Neue, Helvetica, Arial, san-serif",
+            "font-size": "12px"
+        });
     }
 
 });
 
-module.exports = SqlDoc;
+try {
+    module.exports = SqlDoc;
+} catch (e) {
+    console.log(e);
+}

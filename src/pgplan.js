@@ -73,13 +73,13 @@ var Node = function(rn, text){
         }
 
         // detect CTE
-        if (self.text.match(/\s*CTE/) != null && self.text.match(/\s*CTE Scan/) === null){
+        if (self.text.match(/^[\s]*CTE/) != null && self.text.match(/^[\s]*CTE Scan/) === null){
             self.cte = true;
             self.collapsible = true;
             self.subplan = true;
             self.node_description = self.text.match(/^[\s]*(.*)/)[1];
             self.node_details = null;
-            self.cte_id = self.text.match(/\s*CTE ([^\s]*)/)[1];
+            self.cte_id = self.text.match(/^[\s]*CTE ([^\s]*)/)[1];
         }
 
         // detect parent CTE
@@ -328,7 +328,7 @@ var PGPlan = React.createClass({
         var inclusive_gradient = inclusive_color+" "+exclusive_percentage+"%, "+inclusive_color+" "+inclusive_percentage+"%, ";
         var transparent_gradient = "transparent "+inclusive_percentage+"%, transparent 100%";
 
-        var style = "-webkit-linear-gradient(left, "+exclusive_gradient+inclusive_gradient+transparent_gradient+")";
+        var style = "linear-gradient(to right, "+exclusive_gradient+inclusive_gradient+transparent_gradient+")";
 
         // wrap explain plan nodes with span tag
         if (idx == 0 && this.state.highlight){ // 1st row is always a node
@@ -395,7 +395,7 @@ var PGPlan = React.createClass({
 
         return (<tr key={"plan-record-"+idx} className={record_style}>
             {rn}
-            <td style={{backgroundImage: style}}>{val}</td>
+            <td style={{background: style}}>{val}</td>
         </tr>);
             //<td> {record.inclusive_time} </td>
             //<td> {record.exclusive_time} </td>
