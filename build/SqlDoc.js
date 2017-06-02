@@ -9,7 +9,7 @@ function isElectron() {
 if (isElectron()) {
     var React = require('react');
     var ReactDOM = require('react-dom');
-    var Marked = require('marked');
+    var marked = require('marked');
     var $ = require('jquery');
     var d3 = require("d3");
     var topojson = require("topojson");
@@ -108,11 +108,11 @@ var SqlDoc = React.createClass({
     },
 
     markdown: function (str) {
-        var renderer = new Marked.Renderer();
+        var renderer = new marked.Renderer();
         renderer.link = function (href, title, text) {
             return '<a href="#" onClick="openExternal(\'' + href + '\');">' + text + '</a>';
         };
-        return Marked(str, { renderer: renderer });
+        return marked(str, { renderer: renderer });
     },
 
     getHeader: function (query) {
@@ -389,7 +389,6 @@ var SqlDoc = React.createClass({
                 }
                 var field_type = dataset.fields[column_idx].type;
 
-                console.log(field_type);
                 if (DataTypes.isNumeric(field_type)) {
                     fields += '<td class="record-numeric-cell">' + val + '</td>';
                 } else {
@@ -1013,7 +1012,7 @@ var SqlDoc = React.createClass({
                 };
 
                 if (pivot) {
-                    data.rows = pivotTable(dataset);
+                    data.rows = self.pivotTable(dataset);
                     chart_arg_x = 1; // in pivot charts first column is always at axis X
                 }
 
@@ -1180,6 +1179,57 @@ var SqlDoc = React.createClass({
             "font-family": "Helvetica Neue, Helvetica, Arial, san-serif",
             "font-size": "12px"
         });
+    },
+
+    // return a pivot data for a dataset
+    pivotTable: function (dataset) {
+        var column_names = [];
+        var xvalues = [];
+        var values = {};
+        var rows = {};
+        for (rn in dataset.data) {
+            // at first run fill the existing data (rows/columns/values)
+            if (rn == 0) {
+                // skip first row as it contains column names we don't need for pivot
+                continue;
+            }
+            var val1 = dataset.data[rn][0];
+            var val2 = dataset.data[rn][1];
+            if (column_names.indexOf(val2) == -1) {
+                column_names.push(val2);
+            }
+            if (xvalues.indexOf(val1) == -1) {
+                xvalues.push(val1);
+            }
+            if (!(val1 in values)) {
+                values[val1] = [];
+            }
+            values[val1][val2] = dataset.data[rn][2];
+        }
+
+        for (n in xvalues) {
+            // at second run fill the missing values with nulls
+            var val1 = xvalues[n];
+            rows[val1] = [];
+            for (m in column_names) {
+                var val2 = column_names[m];
+                if (val1 in values && val2 in values[val1]) {
+                    rows[val1].push(values[val1][val2]);
+                } else {
+                    rows[val1].push(null);
+                }
+            }
+        }
+
+        var res = [];
+        column_names.unshift(dataset.fields[0].name);
+        res.push(column_names); // first row is pivot column names
+        xvalues.forEach(function (item) {
+            var r = [item].concat(rows[item]);
+            res.push(r);
+        });
+
+        return res;
     }
 
 });
