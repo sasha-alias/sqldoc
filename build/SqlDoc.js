@@ -971,7 +971,7 @@ var SqlDoc = React.createClass({
         // placeholder for future implementation
     },
 
-    mount_charts() {
+    mount_charts: function () {
 
         var self = this;
 

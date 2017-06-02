@@ -785,7 +785,7 @@ var SqlDoc = React.createClass({
         // placeholder for future implementation
     },
 
-    mount_charts(){
+    mount_charts: function(){
 
         var self = this;
 
@@ -925,7 +925,7 @@ var SqlDoc = React.createClass({
 
     },
 
-    mount_bubble_chart(chart_id, dataset){
+    mount_bubble_chart: function()(chart_id, dataset){
 
         if (d3.select("[data-chart-id='"+chart_id+"']").attr("mounted")){ // don't mount if already mounted
             return;
