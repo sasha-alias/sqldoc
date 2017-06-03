@@ -27,6 +27,9 @@ function openExternal(url){
         window.open(url);
     }
 }
+if (typeof(document) != "undefined"){
+    document.openExternal = openExternal;
+}
 
 var formatValue = function(value){
     // escape html tags
