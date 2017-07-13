@@ -374,12 +374,12 @@ var SqlDoc = React.createClass({
         return $("#" + this.limit_ref(dsid));
     },
 
-    renderStaticRecord: function (block_idx, dataset_idx, record_idx, hlr_column) {
+    renderStaticRecord: function (block_idx, dataset_idx, record_idx, hlr_column, rownum_column) {
         // generating text html is much faster than using react
 
         var connector_type = this.state.data[block_idx].connector_type;
         var dataset = this.state.data[block_idx].datasets[dataset_idx];
-        var fields = '<td class="record-rownum">' + (record_idx + 1) + '</td>';
+        var fields = rownum_column == true ? '<td class="record-rownum">' + (record_idx + 1) + '</td>' : '';
         var row = dataset.data[record_idx];
         for (var column_idx = 0; column_idx < row.length; column_idx++) {
             if (column_idx == hlr_column - 1) {
@@ -431,6 +431,18 @@ var SqlDoc = React.createClass({
         return hlr_column;
     },
 
+    shouldRenderRowNumColumn: function (block_idx) {
+        // `rownum=false` parameter defining if the first, left-most ordinal numbered column will be rendered
+        // the default is to render the numbered column
+        var query = this.state.data[block_idx].query;
+
+        var rownum_column = query.match("\\s*rownum\\s*=\\s*(true|false)");
+        if (rownum_column == null) {
+            return true;
+        }
+        return rownum_column[1] == "false" ? false : true;
+    },
+
     renderTable: function (block_idx, dataset, dataset_idx, query) {
         var self = this;
 
@@ -468,6 +480,7 @@ var SqlDoc = React.createClass({
 
         // record highliting column option
         var hlr_column = this.getRecordHighlightingColumn(block_idx);
+        var rownum_column = this.shouldRenderRowNumColumn(block_idx);
 
         var fields = dataset.fields;
         var rows = dataset.data;
@@ -520,13 +533,16 @@ var SqlDoc = React.createClass({
                 }
             });
 
-            out_fields.unshift(React.createElement(
-                'th',
-                { className: 'table-column-header', onClick: function () {
-                        self.setState({ show_datatypes: !self.state.show_datatypes });
-                    } },
-                '#'
-            ));
+            if (rownum_column) {
+                // render the rownum column?
+                out_fields.unshift(React.createElement(
+                    'th',
+                    { className: 'table-column-header', onClick: function () {
+                            self.setState({ show_datatypes: !self.state.show_datatypes });
+                        } },
+                    '#'
+                ));
+            }
 
             var floating_fields = fields.map(function (field, i) {
                 if (i != hlr_column - 1) {
@@ -538,11 +554,15 @@ var SqlDoc = React.createClass({
                     );
                 }
             });
-            floating_fields.unshift(React.createElement(
-                'div',
-                { className: 'floating-field' },
-                '#'
-            ));
+
+            if (rownum_column) {
+                // should render the rownum column?
+                floating_fields.unshift(React.createElement(
+                    'div',
+                    { className: 'floating-field' },
+                    '#'
+                ));
+            }
             this.tables_headers[dsid] = floating_fields;
         };
 
@@ -564,7 +584,7 @@ var SqlDoc = React.createClass({
                 break;
             }
 
-            var row = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column);
+            var row = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column, rownum_column);
             this.rendered_records[dsid] = this.rendered_records[dsid] + 1;
 
             out_rows += row;
@@ -901,6 +921,7 @@ var SqlDoc = React.createClass({
         var limit = Math.min(rendered + 500, len);
         var limit_item = this.limit_item(dsid);
         var hlr_column = this.getRecordHighlightingColumn(block_idx);
+        var rownum_column = this.shouldRenderRowNumColumn(block_idx);
 
         if (rendered == len) {
             return;
@@ -910,7 +931,7 @@ var SqlDoc = React.createClass({
         for (var i = rendered; i < limit; i++) {
             this.rendered_records[dsid] = this.rendered_records[dsid] + 1;
 
-            var row_html = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column);
+            var row_html = this.renderStaticRecord(block_idx, dataset_idx, i, hlr_column, rownum_column);
 
             insert_html += row_html;
         }
