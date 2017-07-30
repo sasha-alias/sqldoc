@@ -995,6 +995,8 @@ var SqlDoc = React.createClass({
 
             var pivot = chart_args.match("\\s*pivot\\s*");
 
+            var stacked = chart_args.match("\\s*stacked\\s*");
+
             var fields = dataset.fields.map(function (field, i) {
                 return field.name;
             });
@@ -1009,9 +1011,20 @@ var SqlDoc = React.createClass({
                 var rows = dataset.data;
                 rows.unshift(fields);
 
+                var groups = [];
+                if (stacked) {
+                    dataset.fields.forEach(function (field, i) {
+                        if (chart_arg_x && i == chart_arg_x - 1) {
+                            // skip x field from stacked group
+                        } else {
+                            groups.push(field.name);
+                        }
+                    });
+                }
                 data = {
                     rows: rows,
-                    type: chart_type
+                    type: chart_type,
+                    groups: [groups]
                 };
 
                 if (pivot) {
