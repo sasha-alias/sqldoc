@@ -79,7 +79,7 @@ var SqlDoc = React.createClass({
     },
 
     componentDidUpdate: function(){
-        mount_charts();
+        this.mount_charts();
     },
 
     componentWillUnmount: function(){
@@ -334,6 +334,9 @@ var SqlDoc = React.createClass({
 
                 if (DataTypes.isNumeric(field_type)){
                     fields += '<td class="record-numeric-cell">'+val+'</td>';
+                } else if (DataTypes.isJSON(field_type)){
+                    let json_view = '<pre class="record-json-value">'+JSON.stringify(JSON.parse(val), null, 2)+'</pre>'
+                    fields += '<td>'+json_view+'</td>';
                 } else {
                     fields += '<td>'+val+'</td>';
                 }
@@ -444,7 +447,7 @@ var SqlDoc = React.createClass({
                     </th>);
                 }
             });
-            
+
             if(rownum_column){
                 // render the rownum column?
                 out_fields.unshift(<th className="table-column-header" onClick={function(){

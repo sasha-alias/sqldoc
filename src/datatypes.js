@@ -20,6 +20,11 @@ var DataTypes = {
         'float64',
     ],
 
+    JSONTypes: [
+        'json',
+        'jsonb',
+    ],
+
     isNumeric: function(datatype){
         if (typeof(datatype) != "undefined" && datatype != null){
             return (this.numericTypes.indexOf(datatype.toLowerCase()) > -1);
@@ -27,6 +32,14 @@ var DataTypes = {
             return false;
         }
     },
+
+    isJSON: function(datatype){
+        if (typeof(datatype) != "undefined" && datatype != null){
+            return (this.JSONTypes.indexOf(datatype.toLowerCase()) > -1);
+        } else {
+            return false;
+        }
+    }
 }
 
 try{
