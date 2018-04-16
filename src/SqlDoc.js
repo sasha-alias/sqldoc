@@ -496,10 +496,9 @@ var SqlDoc = React.createClass({
             out_rows += '<tr><td colSpan="'+fields.length+1+'">'+omitted_message+'</td></tr>';
         }
 
+        var rword = 'rows';
         if (dataset.nrecords == 1){
             rword = 'row';
-        } else {
-            rword = 'rows';
         }
 
         return (
@@ -632,10 +631,9 @@ var SqlDoc = React.createClass({
             csv += row;
         }
 
+        var rword = 'rows';
         if (dataset.nrecords == 1){
             rword = 'row';
-        } else {
-            rword = 'rows';
         }
 
         return (
