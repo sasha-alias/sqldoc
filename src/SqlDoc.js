@@ -226,7 +226,7 @@ var SqlDoc = React.createClass({
                 var footer = this.getFooter(this.state.data[block_idx].query);
                 var block_query = this.getBlockQuery(this.state.data[block_idx].query);
 
-                block = <div key={"block_"+block_idx}>{block_query}{header}{datasets}{footer}</div>;
+                var block = <div key={"block_"+block_idx}>{block_query}{header}{datasets}{footer}</div>;
                 blocks.push(block);
             }
 
