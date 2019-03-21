@@ -205,6 +205,11 @@ var SqlDoc = React.createClass({
             var self = this;
             var blocks = [];
             var duration = 0;
+            var today = new Date();
+            var current_time =
+                ('0'+today.getHours()).slice(-2) + ":" +
+                ('0'+today.getMinutes()).slice(-2) + ":" +
+                ('0'+today.getSeconds()).slice(-2);
 
             // floating columns header
             var floating_cols_header = <div id={"floating-cols-header-"+this.props.eventKey} className="floating-cols-header"></div>
@@ -233,13 +238,14 @@ var SqlDoc = React.createClass({
             // button bar
             if (this.props.buttonBar == true){
                 var buttonBar = <div className="duration-div">
-                    <table className="duration-table">
-                    <tr>
-                    <td><span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span></td>
-                    <td><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></td>
-                    </tr>
-                    </table>
-                    </div>;
+                    <div>
+                        <span className="duration-word">Time:</span> <span className="duration-number">{duration}</span> <span className="duration-word">ms</span>
+                    </div>
+                    <div>
+                        <span className="render-time"> {current_time} </span>
+                    </div>
+                    <div><button type="button" className="btn btn-info" onClick={this.props.onShare}>share</button></div>
+                </div>;
             } else {
                 var buttonBar = null;
             }
@@ -782,7 +788,7 @@ var SqlDoc = React.createClass({
         this.floatingHeader().css({width: $('#dataset_'+dsid).width()});
 
         // get width of each column
-        widths = [];
+        let widths = [];
         $('#dataset_'+dsid+' th').each(function(){
             widths.push($(this).outerWidth());
         });
