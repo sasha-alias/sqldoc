@@ -1,3 +1,5 @@
+'use strict';
+
 function isElectron() {
     if (typeof window != "undefined") {
         return window && window.process && window.process.type;
@@ -30,7 +32,7 @@ if (typeof document != "undefined") {
     document.openExternal = openExternal;
 }
 
-var formatValue = function (value) {
+var formatValue = function formatValue(value) {
     // escape html tags
     value = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -58,7 +60,7 @@ var formatValue = function (value) {
 
 var SqlDoc = React.createClass({
 
-    getInitialState: function () {
+    getInitialState: function getInitialState() {
         this.floating_dsid = null;
         this.tables_headers = {};
         this.lastkeys = [0, 0]; // monitor for CMD+A for selection
@@ -68,7 +70,7 @@ var SqlDoc = React.createClass({
         };
     },
 
-    componentDidMount: function () {
+    componentDidMount: function componentDidMount() {
         var dom_node = ReactDOM.findDOMNode(this);
         dom_node.addEventListener('scroll', this.scrollHandler);
         window.addEventListener('keydown', this.keyHandler);
@@ -80,17 +82,17 @@ var SqlDoc = React.createClass({
         this.mount_charts();
     },
 
-    componentDidUpdate: function () {
-        mount_charts();
+    componentDidUpdate: function componentDidUpdate() {
+        this.mount_charts();
     },
 
-    componentWillUnmount: function () {
+    componentWillUnmount: function componentWillUnmount() {
         ReactDOM.findDOMNode(this).removeEventListener('scroll', this.scrollHandler);
         window.removeEventListener('keydown', this.keyHandler);
         window.removeEventListener('keyup', this.keyUpHandler);
     },
 
-    getRenderer: function (query) {
+    getRenderer: function getRenderer(query) {
         if (this.props.output == 'script') {
             return this.renderTable;
         } else {
@@ -110,7 +112,7 @@ var SqlDoc = React.createClass({
         }
     },
 
-    markdown: function (str) {
+    markdown: function markdown(str) {
         var renderer = new marked.Renderer();
         renderer.link = function (href, title, text) {
             return '<a href="#" onClick="openExternal(\'' + href + '\');">' + text + '</a>';
@@ -118,7 +120,7 @@ var SqlDoc = React.createClass({
         return marked(str, { renderer: renderer });
     },
 
-    getHeader: function (query) {
+    getHeader: function getHeader(query) {
         var cut = query.replace(/^\s*---.*[\s\n]*/, '');
         var match = cut.match('^\s*/\\*\\*([\\s\\S]*?)\\*\\*/');
         if (match != null && match.length == 2) {
@@ -128,7 +130,7 @@ var SqlDoc = React.createClass({
         }
     },
 
-    getFooter: function (query) {
+    getFooter: function getFooter(query) {
         var idx = query.lastIndexOf('/**');
         var idx0 = query.indexOf('/**');
         var check = query.replace(/^\s*---.*[\s\n]*/, '');
@@ -145,7 +147,7 @@ var SqlDoc = React.createClass({
         }
     },
 
-    getBlockQuery: function (query) {
+    getBlockQuery: function getBlockQuery(query) {
         if (typeof this.props.showQuery == 'undefined' || this.props.showQuery == false) {
             return null;
         }
@@ -160,7 +162,7 @@ var SqlDoc = React.createClass({
         );
     },
 
-    sortDataset: function (block_idx, dataset_idx, column_idx) {
+    sortDataset: function sortDataset(block_idx, dataset_idx, column_idx) {
         var dataset = this.state.data[block_idx].datasets[dataset_idx];
         var field_type = dataset.fields[column_idx].type;
 
@@ -210,13 +212,15 @@ var SqlDoc = React.createClass({
         this.setState({ data: data });
     },
 
-    render: function () {
+    render: function render() {
 
         try {
 
             var self = this;
             var blocks = [];
             var duration = 0;
+            var today = new Date();
+            var current_time = ('0' + today.getHours()).slice(-2) + ":" + ('0' + today.getMinutes()).slice(-2) + ":" + ('0' + today.getSeconds()).slice(-2);
 
             // floating columns header
             var floating_cols_header = React.createElement('div', { id: "floating-cols-header-" + this.props.eventKey, className: 'floating-cols-header' });
@@ -238,7 +242,7 @@ var SqlDoc = React.createClass({
                 var footer = this.getFooter(this.state.data[block_idx].query);
                 var block_query = this.getBlockQuery(this.state.data[block_idx].query);
 
-                block = React.createElement(
+                var block = React.createElement(
                     'div',
                     { key: "block_" + block_idx },
                     block_query,
@@ -255,41 +259,44 @@ var SqlDoc = React.createClass({
                     'div',
                     { className: 'duration-div' },
                     React.createElement(
-                        'table',
-                        { className: 'duration-table' },
+                        'div',
+                        null,
                         React.createElement(
-                            'tr',
-                            null,
-                            React.createElement(
-                                'td',
-                                null,
-                                React.createElement(
-                                    'span',
-                                    { className: 'duration-word' },
-                                    'Time:'
-                                ),
-                                ' ',
-                                React.createElement(
-                                    'span',
-                                    { className: 'duration-number' },
-                                    duration
-                                ),
-                                ' ',
-                                React.createElement(
-                                    'span',
-                                    { className: 'duration-word' },
-                                    'ms'
-                                )
-                            ),
-                            React.createElement(
-                                'td',
-                                null,
-                                React.createElement(
-                                    'button',
-                                    { type: 'button', className: 'btn btn-info', onClick: this.props.onShare },
-                                    'share'
-                                )
-                            )
+                            'span',
+                            { className: 'duration-word' },
+                            'Time:'
+                        ),
+                        ' ',
+                        React.createElement(
+                            'span',
+                            { className: 'duration-number' },
+                            duration
+                        ),
+                        ' ',
+                        React.createElement(
+                            'span',
+                            { className: 'duration-word' },
+                            'ms'
+                        )
+                    ),
+                    React.createElement(
+                        'div',
+                        null,
+                        React.createElement(
+                            'span',
+                            { className: 'render-time' },
+                            ' ',
+                            current_time,
+                            ' '
+                        )
+                    ),
+                    React.createElement(
+                        'div',
+                        null,
+                        React.createElement(
+                            'button',
+                            { type: 'button', className: 'btn btn-info', onClick: this.props.onShare },
+                            'share'
                         )
                     )
                 );
@@ -327,11 +334,11 @@ var SqlDoc = React.createClass({
         }
     },
 
-    dsid: function (block_idx, dataset_idx) {
+    dsid: function dsid(block_idx, dataset_idx) {
         return this.props.eventKey + "_" + block_idx + "_" + dataset_idx;
     },
 
-    renderChart: function (block_idx, dataset, dataset_idx, query) {
+    renderChart: function renderChart(block_idx, dataset, dataset_idx, query) {
         var dsid = this.dsid(block_idx, dataset_idx);
 
         if (['PGRES_FATAL_ERROR', 'PGRES_BAD_RESPONSE'].indexOf(dataset.resultStatus) > -1) {
@@ -366,15 +373,15 @@ var SqlDoc = React.createClass({
             dangerouslySetInnerHTML: { __html: hidden_value } });
     },
 
-    limit_ref: function (dsid) {
+    limit_ref: function limit_ref(dsid) {
         return "limit_" + dsid;
     },
 
-    limit_item: function (dsid) {
+    limit_item: function limit_item(dsid) {
         return $("#" + this.limit_ref(dsid));
     },
 
-    renderStaticRecord: function (block_idx, dataset_idx, record_idx, hlr_column, rownum_column) {
+    renderStaticRecord: function renderStaticRecord(block_idx, dataset_idx, record_idx, hlr_column, rownum_column) {
         // generating text html is much faster than using react
 
         var connector_type = this.state.data[block_idx].connector_type;
@@ -394,6 +401,9 @@ var SqlDoc = React.createClass({
 
                 if (DataTypes.isNumeric(field_type)) {
                     fields += '<td class="record-numeric-cell">' + val + '</td>';
+                } else if (DataTypes.isJSON(field_type)) {
+                    var json_view = '<pre class="record-json-value">' + JSON.stringify(JSON.parse(val), null, 2) + '</pre>';
+                    fields += '<td>' + json_view + '</td>';
                 } else {
                     fields += '<td>' + val + '</td>';
                 }
@@ -417,7 +427,7 @@ var SqlDoc = React.createClass({
         return '<tr class="' + tr_class + '">' + fields + '</tr>';
     },
 
-    getRecordHighlightingColumn: function (block_idx) {
+    getRecordHighlightingColumn: function getRecordHighlightingColumn(block_idx) {
         // record highlighting column is the `hlr=N` parameter defining the column number which is responsible for record highlighting
 
         var query = this.state.data[block_idx].query;
@@ -431,7 +441,7 @@ var SqlDoc = React.createClass({
         return hlr_column;
     },
 
-    shouldRenderRowNumColumn: function (block_idx) {
+    shouldRenderRowNumColumn: function shouldRenderRowNumColumn(block_idx) {
         // `rownum=false` parameter defining if the first, left-most ordinal numbered column will be rendered
         // the default is to render the numbered column
         var query = this.state.data[block_idx].query;
@@ -443,7 +453,7 @@ var SqlDoc = React.createClass({
         return rownum_column[1] == "false" ? false : true;
     },
 
-    renderTable: function (block_idx, dataset, dataset_idx, query) {
+    renderTable: function renderTable(block_idx, dataset, dataset_idx, query) {
         var self = this;
 
         var connector_type = this.state.data[block_idx].connector_type;
@@ -495,7 +505,7 @@ var SqlDoc = React.createClass({
                 if (i != hlr_column - 1) {
                     // skip record highlighting column
 
-                    var sortFunction = function () {
+                    var sortFunction = function sortFunction() {
                         self.sortDataset(block_idx, dataset_idx, i);
                     };
 
@@ -537,7 +547,7 @@ var SqlDoc = React.createClass({
                 // render the rownum column?
                 out_fields.unshift(React.createElement(
                     'th',
-                    { className: 'table-column-header', onClick: function () {
+                    { className: 'table-column-header', onClick: function onClick() {
                             self.setState({ show_datatypes: !self.state.show_datatypes });
                         } },
                     '#'
@@ -594,10 +604,9 @@ var SqlDoc = React.createClass({
             out_rows += '<tr><td colSpan="' + fields.length + 1 + '">' + omitted_message + '</td></tr>';
         }
 
+        var rword = 'rows';
         if (dataset.nrecords == 1) {
             rword = 'row';
-        } else {
-            rword = 'rows';
         }
 
         return React.createElement(
@@ -654,7 +663,7 @@ var SqlDoc = React.createClass({
         );
     },
 
-    renderCrossTable: function (block_idx, dataset, dataset_idx, query) {
+    renderCrossTable: function renderCrossTable(block_idx, dataset, dataset_idx, query) {
         var data = dataset.data;
         var header = [];
         var sidebar = [];
@@ -737,7 +746,7 @@ var SqlDoc = React.createClass({
         );
     },
 
-    renderMap: function (block_idx, dataset, dataset_idx, query) {
+    renderMap: function renderMap(block_idx, dataset, dataset_idx, query) {
         return React.createElement(
             'div',
             { className: 'error alert alert-danger' },
@@ -747,7 +756,7 @@ var SqlDoc = React.createClass({
         return React.createElement('div', null);
     },
 
-    renderCsv: function (block_idx, dataset, dataset_idx, query) {
+    renderCsv: function renderCsv(block_idx, dataset, dataset_idx, query) {
         var dsid = this.dsid(block_idx, dataset_idx);
 
         var out_fields = [];
@@ -790,10 +799,9 @@ var SqlDoc = React.createClass({
             csv += row;
         }
 
+        var rword = 'rows';
         if (dataset.nrecords == 1) {
             rword = 'row';
-        } else {
-            rword = 'rows';
         }
 
         return React.createElement(
@@ -833,11 +841,11 @@ var SqlDoc = React.createClass({
         );
     },
 
-    renderHidden: function (block_idx, dataset, dataset_idx, query) {
+    renderHidden: function renderHidden(block_idx, dataset, dataset_idx, query) {
         return null;
     },
 
-    selectAll: function () {
+    selectAll: function selectAll() {
         // select content of entire output
         node = ReactDOM.findDOMNode(this);
         var range = document.createRange();
@@ -847,7 +855,7 @@ var SqlDoc = React.createClass({
         sel.addRange(range);
     },
 
-    keyHandler: function (e) {
+    keyHandler: function keyHandler(e) {
         // follow the pressed keys and trigger selectAll when ctrl+a or cmd+a pressed
         this.lastkeys[0] = this.lastkeys[1];
         this.lastkeys[1] = e.keyCode;
@@ -861,14 +869,14 @@ var SqlDoc = React.createClass({
             }
     },
 
-    keyUpHandler: function (e) {
+    keyUpHandler: function keyUpHandler(e) {
         // reset lastkeys if the cmd or ctrl key was released
         if (e.keyCode == 91 || e.keyCode == 17) {
             this.lastkeys = [0, 0];
         }
     },
 
-    scrollHandler: function (e) {
+    scrollHandler: function scrollHandler(e) {
         var container = $(ReactDOM.findDOMNode(this));
         for (var block_idx = 0; block_idx < this.state.data.length; block_idx++) {
             for (var dataset_idx = 0; dataset_idx < this.state.data[block_idx].datasets.length; dataset_idx++) {
@@ -914,7 +922,7 @@ var SqlDoc = React.createClass({
         }
     },
 
-    renderNext: function (block_idx, dataset_idx) {
+    renderNext: function renderNext(block_idx, dataset_idx) {
         var dsid = this.dsid(block_idx, dataset_idx);
         var rendered = this.rendered_records[dsid];
         var len = this.state.data[block_idx].datasets[dataset_idx].data.length;
@@ -948,11 +956,11 @@ var SqlDoc = React.createClass({
         }
     },
 
-    floatingHeader: function () {
+    floatingHeader: function floatingHeader() {
         return $('#floating-cols-header-' + this.props.eventKey);
     },
 
-    showFloatingHeader: function (dsid, left) {
+    showFloatingHeader: function showFloatingHeader(dsid, left) {
         var self = this;
         this.floatingHeader().show().offset({
             left: left
@@ -968,7 +976,7 @@ var SqlDoc = React.createClass({
         this.floatingHeader().css({ width: $('#dataset_' + dsid).width() });
 
         // get width of each column
-        widths = [];
+        var widths = [];
         $('#dataset_' + dsid + ' th').each(function () {
             widths.push($(this).outerWidth());
         });
@@ -983,19 +991,19 @@ var SqlDoc = React.createClass({
         });
     },
 
-    hideFloatingHeader: function (dsid) {
+    hideFloatingHeader: function hideFloatingHeader(dsid) {
         this.floatingHeader().hide();
     },
 
-    adjustFloatingHeader: function () {
+    adjustFloatingHeader: function adjustFloatingHeader() {
         console.log(this.floatingHeader().is(':visible'));
     },
 
-    mountMap: function (dom_node) {
+    mountMap: function mountMap(dom_node) {
         // placeholder for future implementation
     },
 
-    mount_charts: function () {
+    mount_charts: function mount_charts() {
 
         var self = this;
 
@@ -1143,7 +1151,7 @@ var SqlDoc = React.createClass({
         });
     },
 
-    mount_bubble_chart: function (chart_id, dataset) {
+    mount_bubble_chart: function mount_bubble_chart(chart_id, dataset) {
 
         if (d3.select("[data-chart-id='" + chart_id + "']").attr("mounted")) {
             // don't mount if already mounted
@@ -1219,7 +1227,7 @@ var SqlDoc = React.createClass({
     },
 
     // return a pivot data for a dataset
-    pivotTable: function (dataset) {
+    pivotTable: function pivotTable(dataset) {
         var column_names = [];
         var xvalues = [];
         var values = {};

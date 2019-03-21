@@ -1,9 +1,11 @@
+'use strict';
+
 try {
     var React = require('react');
     var ReactDOM = require('react-dom');
 } catch (e) {}
 
-var Node = function (rn, text) {
+var Node = function Node(rn, text) {
     var self = this;
     this.rn = rn;
     this.text = text;
@@ -144,13 +146,13 @@ var Node = function (rn, text) {
     return self;
 };
 
-var PGPlanNodes = function (records) {
+var PGPlanNodes = function PGPlanNodes(records) {
 
     var nodes = [];
     var ctes = [];
     var subplans = [];
 
-    var getParent = function (node) {
+    var getParent = function getParent(node) {
         var ret = null;
         nodes.forEach(function (item) {
             if (item.node_level < node.node_level) {
@@ -174,7 +176,7 @@ var PGPlanNodes = function (records) {
         }
     });
 
-    var deductCte = function (deducted_node, subtrahend) {
+    var deductCte = function deductCte(deducted_node, subtrahend) {
         if (subtrahend.kids.length < 1) {
             return;
         }
@@ -240,7 +242,7 @@ var PGPlanNodes = function (records) {
 
 var PGPlan = React.createClass({
 
-    getInitialState: function () {
+    getInitialState: function getInitialState() {
         return {
             data: this.props.nodes,
             show_row_number: true,
@@ -254,23 +256,23 @@ var PGPlan = React.createClass({
         };
     },
 
-    componentDidMount: function () {
+    componentDidMount: function componentDidMount() {
         if (this.state.view == "tree") {
             this.mountTree();
         }
     },
 
-    componentDidUpdate: function () {
+    componentDidUpdate: function componentDidUpdate() {
         if (this.state.view == "tree") {
             this.mountTree();
         }
     },
 
-    componentWillReceiveProps: function (newprops) {
+    componentWillReceiveProps: function componentWillReceiveProps(newprops) {
         this.setState({ data: newprops.nodes });
     },
 
-    collapseSwitch: function (record_idx) {
+    collapseSwitch: function collapseSwitch(record_idx) {
         var data = this.state.data;
 
         var is_collapsed = !data[record_idx].collapsed;
@@ -285,19 +287,19 @@ var PGPlan = React.createClass({
         this.setState({ data: data });
     },
 
-    switchRowNumber: function () {
+    switchRowNumber: function switchRowNumber() {
         this.setState({ show_row_number: !this.state.show_row_number });
     },
 
-    switchView: function (view, subview) {
+    switchView: function switchView(view, subview) {
         this.setState({ view: view, subview: subview });
     },
 
-    switchHighlight: function () {
+    switchHighlight: function switchHighlight() {
         this.setState({ highlight: !this.state.highlight });
     },
 
-    renderRecord: function (record, idx) {
+    renderRecord: function renderRecord(record, idx) {
 
         var self = this;
 
@@ -373,7 +375,7 @@ var PGPlan = React.createClass({
                 var collapse = React.createElement(
                     'span',
                     null,
-                    React.createElement('span', { className: "glyphicon " + collapse_icon + " explain-plan-node-arrow", onClick: function () {
+                    React.createElement('span', { className: "glyphicon " + collapse_icon + " explain-plan-node-arrow", onClick: function onClick() {
                             self.collapseSwitch(idx);
                         } }),
                     React.createElement(
@@ -450,7 +452,7 @@ var PGPlan = React.createClass({
         //<td> {record.time_percentage} % </td>
     },
 
-    render: function () {
+    render: function render() {
         var self = this;
 
         if (this.state.view == "tree") {
@@ -510,7 +512,7 @@ var PGPlan = React.createClass({
         );
     },
 
-    renderViewSwitcher: function () {
+    renderViewSwitcher: function renderViewSwitcher() {
         var self = this;
         if (self.state.view == "tree") {
             var zoom = React.createElement(
@@ -525,34 +527,34 @@ var PGPlan = React.createClass({
         return React.createElement(
             'div',
             { className: 'explain-plan-toolbar' },
-            React.createElement('span', { className: 'glyphicon glyphicon-th-list explain-plan-view-switcher', onClick: function () {
+            React.createElement('span', { className: 'glyphicon glyphicon-th-list explain-plan-view-switcher', onClick: function onClick() {
                     self.switchView("plain");
                 } }),
-            React.createElement('span', { className: 'glyphicon glyphicon-tree-deciduous explain-plan-view-switcher', onClick: function () {
+            React.createElement('span', { className: 'glyphicon glyphicon-tree-deciduous explain-plan-view-switcher', onClick: function onClick() {
                     self.switchView("tree");
                 } }),
-            React.createElement('span', { className: 'glyphicon glyphicon-tree-conifer explain-plan-view-switcher', onClick: function () {
+            React.createElement('span', { className: 'glyphicon glyphicon-tree-conifer explain-plan-view-switcher', onClick: function onClick() {
                     self.switchView("tree", "conifer");
                 } }),
             zoom
         );
     },
 
-    zoomIn: function () {
+    zoomIn: function zoomIn() {
         this.setState({ viewport_size: {
                 width: this.state.viewport_size.width + 100,
                 height: this.state.viewport_size.height + 200
             } });
     },
 
-    zoomOut: function () {
+    zoomOut: function zoomOut() {
         this.setState({ viewport_size: {
                 width: this.state.viewport_size.width - 100,
                 height: this.state.viewport_size.height - 200
             } });
     },
 
-    renderTree: function () {
+    renderTree: function renderTree() {
         var self = this;
         return React.createElement(
             'div',
@@ -562,7 +564,7 @@ var PGPlan = React.createClass({
         );
     },
 
-    mountTree: function () {
+    mountTree: function mountTree() {
         var self = this;
         var treeData = [this.state.data[0]];
 
