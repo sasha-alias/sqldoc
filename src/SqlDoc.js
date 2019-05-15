@@ -60,9 +60,20 @@ var SqlDoc = React.createClass({
         this.floating_dsid = null;
         this.tables_headers = {};
         this.lastkeys = [0, 0]; // monitor for CMD+A for selection
+
+        // detect if document is encrypted
+        var encrypted = false;
+        this.props.data.forEach( function(item) {
+            if (item.encrypted){
+                encrypted = true;
+            }
+        } );
+
         return {
             data: this.props.data,
             show_datatypes: false,
+            encrypted,
+            error: null,
         };
     },
 
@@ -198,7 +209,52 @@ var SqlDoc = React.createClass({
         this.setState({data: data});
     },
 
+    decryptDocument: function(){
+        var encryptionKey = this.encryptionKeyField.value;
+
+        try {
+            this.state.data.forEach( function(item){
+                // decrypt datasets
+                var bytes = CryptoJS.AES.decrypt(item.datasets, encryptionKey);
+                var decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+                item.datasets = decryptedData;
+                // decrypt queries
+                var bytes = CryptoJS.AES.decrypt(item.query, encryptionKey);
+                var decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                item.query = decryptedData;
+                //
+            });
+            this.setState({encrypted: false});
+        } catch (e){
+            this.setState({error: "Failed to decrypt document"});
+        }
+    },
+
+    renderEncryptionDialog: function(){
+        return <div>
+            The document is encrypted. Please enter the encryption key to view it:
+            <input ref={ function(item){ this.encryptionKeyField = ReactDOM.findDOMNode(item); }.bind(this) }
+                className="encryption-key-input"
+                type="text"
+                onKeyPress = { function(e){ if (e.key === 'Enter'){ this.decryptDocument() } }.bind(this) }
+            />
+            <button onClick={ this.decryptDocument }> Decrypt </button>
+        </div>
+    },
+
     render: function(){
+
+        if (this.state.error){
+            return (
+                <div className="error alert alert-danger">
+                    { this.state.error }
+                </div>
+            );
+        }
+
+        if (this.state.encrypted){
+            return this.renderEncryptionDialog()
+        }
 
         try {
 

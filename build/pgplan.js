@@ -427,6 +427,7 @@ var PGPlan = React.createClass({
             }
         }
 
+        var rn = null;
         if (this.state.show_row_number) {
             rn = React.createElement(
                 'td',

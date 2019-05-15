@@ -387,6 +387,7 @@ var PGPlan = React.createClass({
             }
         }
 
+        var rn = null;
         if (this.state.show_row_number){
             rn = <td className="record-rownum">{idx+1}</td>
         } else {
