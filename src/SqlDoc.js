@@ -11,6 +11,7 @@ if (isElectron()){
     var ReactDOM = require('react-dom');
     var marked = require('marked');
     var $ = require('jquery');
+    var c3 = require("c3");
     var d3 = require("d3");
     var topojson = require("topojson");
     var PGPlan = require("./pgplan").PGPlan;

@@ -9,6 +9,7 @@
     "mocha": "^2.2.5"
   },
   "dependencies": {
+    "c3": "^0.4.0",
     "d3": "^3.5.0",
     "jquery": "^3.3.1",
     "marked": "^0.3.3",
@@ -19,6 +20,7 @@
   "main": "sqldoc.js",
   "scripts": {
     "test": "node_modules/.bin/mocha",
+    "build": "babel --plugins transform-react-jsx --presets es2015 --out-dir=build src/",
     "build:watch": "babel --plugins transform-react-jsx --presets es2015 --out-dir=build src/ --watch"
   }
 }
