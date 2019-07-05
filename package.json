@@ -4,11 +4,16 @@
   "devDependencies": {
     "babel": "^6.23.0",
     "babel-cli": "^6.24.1",
+    "babel-eslint": "^10.0.1",
     "babel-plugin-transform-react-jsx": "^6.24.1",
     "babel-preset-es2015": "^6.24.1",
+    "eslint": "^5.16.0",
+    "eslint-plugin-react": "^7.13.0",
     "mocha": "^2.2.5"
   },
   "dependencies": {
+    "c3": "^0.7.0",
+    "crypto-js": "^3.1.9-1",
     "d3": "^3.5.0",
     "jquery": "^3.3.1",
     "marked": "^0.3.3",
@@ -19,6 +24,7 @@
   "main": "sqldoc.js",
   "scripts": {
     "test": "node_modules/.bin/mocha",
-    "build:watch": "babel --plugins transform-react-jsx --presets es2015 --out-dir=build src/ --watch"
+    "build": "eslint src/ && babel --plugins transform-react-jsx --presets es2015 --out-dir=build src/",
+    "build:watch": "eslint src/ && babel --plugins transform-react-jsx --presets es2015 --out-dir=build src/ --watch"
   }
 }

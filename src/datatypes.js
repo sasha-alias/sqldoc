@@ -44,4 +44,6 @@ var DataTypes = {
 
 try{
     module.exports = DataTypes;
-} catch(e){}
+} catch(e){
+    // skip
+}

@@ -1,7 +1,8 @@
 try {
-var React = require('react');
-var ReactDOM = require('react-dom');
+    var React = require('react');
+    var d3 = require('d3');
 } catch(e) {
+    // pass
 }
 
 var Node = function(rn, text){
@@ -56,8 +57,8 @@ var Node = function(rn, text){
         self.never_executed = (self.text.match(/\(never executed\)/) != null)
 
         if (self.text.match(/\(+/) != null){ // if at least one bracket
-            self.node_description = self.text.match(/\s*[->]*(.*?)[\(]/)[1];
-            self.node_details = self.text.match(/[\(].*/)[0];
+            self.node_description = self.text.match(/\s*[->]*(.*?)[(]/)[1];
+            self.node_details = self.text.match(/[(].*/)[0];
         } else { // row without bracket is a details row
             self.node_description = null;
             self.node_details = self.text.match(/^[\s]*(.*)/)[1];
@@ -216,15 +217,13 @@ var PGPlanNodes = function (records){
     var total_cost = summary_record.cost ? summary_record.cost[1] : null;
     var total_time = summary_record.inclusive_time;
 
-    records.forEach(function(record, idx){
+    records.forEach(function(record, idx){ // eslint-disable-line no-unused-vars
         var exclusive_cost = record.exclusive_cost ? record.exclusive_cost : null;
 
         var inclusive_cost_percentage = record.cost ? record.cost[1]/total_cost*100 : null;
         var inclusive_time_percentage = record.time ? record.time[1]*record.loops/total_time*100 : null;
         var cost_percentage = exclusive_cost ? exclusive_cost/total_cost*100 : null;
         var time_percentage = record.exclusive_time ? record.exclusive_time/total_time*100 : null;
-
-        var val = record[0];
 
         record.cost_percentage = cost_percentage;
         record.inclusive_cost_percentage = inclusive_cost_percentage;
@@ -305,20 +304,18 @@ var PGPlan = React.createClass({
 
         var val = record[0];
 
+        var exclusive_percentage = record.cost_percentage;
+        var inclusive_percentage = record.inclusive_cost_percentage;
         if (record.time_percentage != null){
-            var exclusive_percentage = record.time_percentage;
-            var inclusive_percentage = record.inclusive_time_percentage;
-        } else {
-            var exclusive_percentage = record.cost_percentage;
-            var inclusive_percentage = record.inclusive_cost_percentage;
+            exclusive_percentage = record.time_percentage;
+            inclusive_percentage = record.inclusive_time_percentage;
         }
 
+        var exclusive_color = "rgba(251, 2, 2, 0.4)";
+        var inclusive_color = "rgba(251, 2, 2, 0.1)";
         if (record.never_executed){
-            var exclusive_color = "rgba(51, 122, 183, 0.4)";
-            var inclusive_color = "rgba(51, 122, 183, 0.1)";
-        } else {
-            var exclusive_color = "rgba(251, 2, 2, 0.4)";
-            var inclusive_color = "rgba(251, 2, 2, 0.1)";
+            exclusive_color = "rgba(51, 122, 183, 0.4)";
+            inclusive_color = "rgba(51, 122, 183, 0.1)";
         }
 
         if (exclusive_percentage === null){exclusive_percentage = 0}
@@ -332,7 +329,7 @@ var PGPlan = React.createClass({
 
         // wrap explain plan nodes with span tag
         if (idx == 0 && this.state.highlight){ // 1st row is always a node
-            var val = <span>
+            val = <span>
                 <span className="explain-plan-header-title">
                     {record.node_description}
                 </span>
@@ -341,36 +338,34 @@ var PGPlan = React.createClass({
                 </span></span>
         } else {
             var spaces = <span>{" ".repeat(record.node_level)}</span>;
-            if (record.collapsible && !record.subplan) {
-                var record_style = "explain-plan-collapsible-record";
 
+            var record_style = "explain-plan-record";
+            var collapse = null;
+            var collapse_note = null;
+            if (record.collapsible && !record.subplan) {
+                record_style = "explain-plan-collapsible-record";
+
+                var collapse_icon = "glyphicon-circle-arrow-right";
                 if (record.collapsed){
-                    var collapse_icon = "glyphicon-circle-arrow-up";
-                    var collapse_note = "[subtree skipped]";
-                } else {
-                    var collapse_icon = "glyphicon-circle-arrow-right";
-                    var collapse_note = null;
+                    collapse_icon = "glyphicon-circle-arrow-up";
+                    collapse_note = "[subtree skipped]";
                 }
 
-                var collapse = <span>
+                collapse = <span>
                     <span className={"glyphicon "+collapse_icon+" explain-plan-node-arrow"} onClick={
                         function(){self.collapseSwitch(idx);}
                     }></span>
                     <span className="explain-plan-node-arrow-hidden">-&gt;</span>
                 </span>;
-            } else {
-                var record_style = "explain-plan-record";
-                var collapse = null;
-                var collapse_note = null;
             }
 
             if (record.cte) {
-                var record_style = "explain-plan-cte-record";
+                record_style = "explain-plan-cte-record";
             }
             ///////
 
             if (this.state.highlight){
-                var val = <span>
+                val = <span>
                     {spaces}
                     {collapse}
                     <span className="explain-plan-node-title">
@@ -382,8 +377,8 @@ var PGPlan = React.createClass({
                     <span className="explain-plan-node-skipped-note">{collapse_note}</span>
                 </span>
             } else {
-                var val = <span>{record.text}</span>
-                var style = "";
+                val = <span>{record.text}</span>
+                style = "";
             }
         }
 
@@ -410,7 +405,6 @@ var PGPlan = React.createClass({
             return this.renderTree();
         }
 
-        var self = this;
         var data = this.state.data;
         var plan_records = [];
 
@@ -441,13 +435,12 @@ var PGPlan = React.createClass({
 
     renderViewSwitcher: function(){
         var self = this;
+        var zoom = null;
         if (self.state.view == "tree"){
-            var zoom = <span>
+            zoom = <span>
                 <span className="glyphicon glyphicon-zoom-out explain-plan-view-switcher" onClick={self.zoomOut}></span>
                 <span className="glyphicon glyphicon-zoom-in explain-plan-view-switcher" onClick={self.zoomIn}></span>
             </span>
-        } else {
-            var zoom = null;
         }
         return (
         <div className="explain-plan-toolbar">
@@ -520,10 +513,10 @@ var PGPlan = React.createClass({
               .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
 
-        root = treeData[0];
+        var root = treeData[0];
         update(root);
 
-        function update(source) {
+        function update() {
 
             // Compute tree layout.
             var nodes = tree.nodes(root),
@@ -642,4 +635,6 @@ try{
         "PGPlan": PGPlan,
         "PGPlanNodes": PGPlanNodes,
     }
-} catch(e){}
+} catch(e){
+    // pass
+}

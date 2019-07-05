@@ -14,7 +14,8 @@ if (isElectron()) {
     var marked = require('marked');
     var $ = require('jquery');
     var d3 = require("d3");
-    var topojson = require("topojson");
+    var c3 = require("c3");
+    var CryptoJS = require("crypto-js");
     var PGPlan = require("./pgplan").PGPlan;
     var PGPlanNodes = require("./pgplan").PGPlanNodes;
     var DataTypes = require("./datatypes");
@@ -87,9 +88,6 @@ var SqlDoc = React.createClass({
         window.addEventListener('keydown', this.keyHandler);
         window.addEventListener('keyup', this.keyUpHandler);
 
-        if (this.mount_map) {
-            this.mountMap(dom_node);
-        }
         this.mount_charts();
     },
 
@@ -107,16 +105,14 @@ var SqlDoc = React.createClass({
         if (this.props.output == 'script') {
             return this.renderTable;
         } else {
-            if (query.match('^\\s*---\\s+chart\s*.*') != null) {
+            if (query.match(/^\s*---\s+chart\s*.*/) != null) {
                 return this.renderChart;
-            } else if (query.match('^\\s*---\\s+csv\s*.*') != null) {
+            } else if (query.match(/^\s*---\s+csv\s*.*/) != null) {
                 return this.renderCsv;
-            } else if (query.match('^\\s*---\\s+hidden\s*.*') != null) {
+            } else if (query.match(/^\s*---\s+hidden\s*.*/) != null) {
                 return this.renderHidden;
-            } else if (query.match('^\\s*---\\s+crosstable\s*.*') != null) {
+            } else if (query.match(/^\s*---\s+crosstable\s*.*/) != null) {
                 return this.renderCrossTable;
-            } else if (query.match('^\\s*---\\s+map\s*') != null) {
-                return this.renderMap;
             } else {
                 return this.renderTable;
             }
@@ -133,7 +129,7 @@ var SqlDoc = React.createClass({
 
     getHeader: function getHeader(query) {
         var cut = query.replace(/^\s*---.*[\s\n]*/, '');
-        var match = cut.match('^\s*/\\*\\*([\\s\\S]*?)\\*\\*/');
+        var match = cut.match('^[\\s]*/\\*\\*([\\s\\S]*?)\\*\\*/');
         if (match != null && match.length == 2) {
             return React.createElement('div', { className: 'markdown-block', dangerouslySetInnerHTML: { __html: this.markdown(match[1]) } });
         } else {
@@ -178,24 +174,29 @@ var SqlDoc = React.createClass({
         var field_type = dataset.fields[column_idx].type;
 
         function compareAsc(a, b) {
+            var aval;
+            var bval;
             if (DataTypes.isNumeric(field_type)) {
-                var aval = Number(a[column_idx]);
-                var bval = Number(b[column_idx]);
+                aval = Number(a[column_idx]);
+                bval = Number(b[column_idx]);
             } else {
-                var aval = a[column_idx];
-                var bval = b[column_idx];
+                aval = a[column_idx];
+                bval = b[column_idx];
             }
             if (aval < bval) return -1;
             if (aval > bval) return 1;
             return 0;
         }
+
         function compareDesc(a, b) {
+            var aval;
+            var bval;
             if (DataTypes.isNumeric(field_type)) {
-                var aval = Number(a[column_idx]);
-                var bval = Number(b[column_idx]);
+                aval = Number(a[column_idx]);
+                bval = Number(b[column_idx]);
             } else {
-                var aval = a[column_idx];
-                var bval = b[column_idx];
+                aval = a[column_idx];
+                bval = b[column_idx];
             }
             if (aval < bval) return 1;
             if (aval > bval) return -1;
@@ -208,12 +209,14 @@ var SqlDoc = React.createClass({
                 field.sort = null;
             }
         });
+
+        var compare;
         if (dataset.fields[column_idx].sort == "asc") {
             dataset.fields[column_idx].sort = "desc";
-            var compare = compareDesc;
+            compare = compareDesc;
         } else {
             dataset.fields[column_idx].sort = "asc";
-            var compare = compareAsc;
+            compare = compareAsc;
         }
 
         dataset.data = dataset.data.sort(compare);
@@ -232,9 +235,10 @@ var SqlDoc = React.createClass({
                 var bytes = CryptoJS.AES.decrypt(item.datasets, encryptionKey);
                 var decryptedData = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
                 item.datasets = decryptedData;
+
                 // decrypt queries
-                var bytes = CryptoJS.AES.decrypt(item.query, encryptionKey);
-                var decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                bytes = CryptoJS.AES.decrypt(item.query, encryptionKey);
+                decryptedData = bytes.toString(CryptoJS.enc.Utf8);
                 item.query = decryptedData;
                 //
             });
@@ -322,8 +326,9 @@ var SqlDoc = React.createClass({
             }
 
             // button bar
+            var buttonBar = null;
             if (this.props.buttonBar == true) {
-                var buttonBar = React.createElement(
+                buttonBar = React.createElement(
                     'div',
                     { className: 'duration-div' },
                     React.createElement(
@@ -368,8 +373,6 @@ var SqlDoc = React.createClass({
                         )
                     )
                 );
-            } else {
-                var buttonBar = null;
             }
 
             return React.createElement(
@@ -379,8 +382,6 @@ var SqlDoc = React.createClass({
                 buttonBar,
                 blocks
             );
-
-            return React.createElement('div', null);
         } catch (err) {
             return React.createElement(
                 'div',
@@ -428,7 +429,7 @@ var SqlDoc = React.createClass({
             chart_args = chart_args[1];
         } else {
             chart_args = '';
-        };
+        }
 
         var chart_id = 'chart_' + dsid;
 
@@ -452,7 +453,6 @@ var SqlDoc = React.createClass({
     renderStaticRecord: function renderStaticRecord(block_idx, dataset_idx, record_idx, hlr_column, rownum_column) {
         // generating text html is much faster than using react
 
-        var connector_type = this.state.data[block_idx].connector_type;
         var dataset = this.state.data[block_idx].datasets[dataset_idx];
         var fields = rownum_column == true ? '<td class="record-rownum">' + (record_idx + 1) + '</td>' : '';
         var row = dataset.data[record_idx];
@@ -478,20 +478,20 @@ var SqlDoc = React.createClass({
             }
         }
 
+        var tr_class = 'record-no-hl';
         if (hlr_column != null && row.length >= hlr_column) {
             var hlr_value = row[hlr_column - 1];
             if (hlr_value == -1) {
-                var tr_class = "record-negative-hl";
+                tr_class = "record-negative-hl";
             } else if (hlr_value == 0) {
-                var tr_class = "record-neutral-hl";
+                tr_class = "record-neutral-hl";
             } else if (hlr_value == 1) {
-                var tr_class = "record-positive-hl";
+                tr_class = "record-positive-hl";
             } else {
-                var tr_class = "record-no-hl";
+                tr_class = "record-no-hl";
             }
-        } else {
-            var tr_class = 'record-no-hl';
         }
+
         return '<tr class="' + tr_class + '">' + fields + '</tr>';
     },
 
@@ -501,12 +501,12 @@ var SqlDoc = React.createClass({
         var query = this.state.data[block_idx].query;
 
         var hlr_column = query.match("\\s*hlr\\s*=\\s*([0-9]*)");
+
+        var highlightingColumn = null;
         if (hlr_column != null && hlr_column.length > 0) {
-            var hlr_column = hlr_column[1];
-        } else {
-            var hlr_column = null;
+            highlightingColumn = hlr_column[1];
         }
-        return hlr_column;
+        return highlightingColumn;
     },
 
     shouldRenderRowNumColumn: function shouldRenderRowNumColumn(block_idx) {
@@ -522,6 +522,7 @@ var SqlDoc = React.createClass({
     },
 
     renderTable: function renderTable(block_idx, dataset, dataset_idx, query) {
+        // eslint-disable-line no-unused-vars
         var self = this;
 
         var connector_type = this.state.data[block_idx].connector_type;
@@ -577,23 +578,21 @@ var SqlDoc = React.createClass({
                         self.sortDataset(block_idx, dataset_idx, i);
                     };
 
+                    var sort_style = "table-column-sorted-none";
                     if (field.sort == "asc") {
-                        var sort_style = "table-column-sorted-asc";
+                        sort_style = "table-column-sorted-asc";
                     } else if (field.sort == "desc") {
-                        var sort_style = "table-column-sorted-desc";
-                    } else {
-                        var sort_style = "table-column-sorted-none";
+                        sort_style = "table-column-sorted-desc";
                     }
 
+                    var datatype = null;
                     if (self.state.show_datatypes) {
-                        var datatype = React.createElement(
+                        datatype = React.createElement(
                             'span',
                             { className: 'table-column-header-datatype' },
                             React.createElement('br', null),
                             field.type
                         );
-                    } else {
-                        var datatype = null;
                     }
 
                     return React.createElement(
@@ -642,21 +641,21 @@ var SqlDoc = React.createClass({
                 ));
             }
             this.tables_headers[dsid] = floating_fields;
-        };
+        }
 
         var out_rows = "";
         var omitted_count = 0;
+
+        var limit = rows.length; // render all
         if (this.props.buttonBar) {
-            var limit = Math.min(100, rows.length - this.rendered_records[dsid]); // render only 1st 100 records, the rest render on scroll
-        } else {
-            var limit = rows.length; // render all
+            limit = Math.min(100, rows.length - this.rendered_records[dsid]); // render only 1st 100 records, the rest render on scroll
         }
 
         for (var i = this.rendered_records[dsid]; i <= limit; i++) {
 
             if (i == limit) {
                 if (i < rows.length) {
-                    var omitted_count = rows.length - this.rendered_records[dsid] + 1;
+                    omitted_count = rows.length - this.rendered_records[dsid] + 1;
                     var omitted_message = '<span id="' + this.limit_ref(dsid) + '" class="omitted-message">' + omitted_count + ' more </span>';
                 }
                 break;
@@ -732,44 +731,52 @@ var SqlDoc = React.createClass({
     },
 
     renderCrossTable: function renderCrossTable(block_idx, dataset, dataset_idx, query) {
+        // eslint-disable-line no-unused-vars
         var data = dataset.data;
         var header = [];
         var sidebar = [];
         var values = {};
         var rows = {};
-        for (rn in data) {
-            // detect all pairs
 
-            var val1 = data[rn][0];
-            var val2 = data[rn][1];
+        var detectAllPairs = function detectAllPairs() {
+            for (var rn in data) {
+                // detect all pairs
 
-            if (header.indexOf(val2) == -1) {
-                header.push(val2);
+                var val1 = data[rn][0];
+                var val2 = data[rn][1];
+
+                if (header.indexOf(val2) == -1) {
+                    header.push(val2);
+                }
+
+                if (sidebar.indexOf(val1) == -1) {
+                    sidebar.push(val1);
+                }
+
+                if (!(val1 in values)) {
+                    values[val1] = {};
+                }
+                values[val1][val2] = data[rn][2];
             }
+        };
+        detectAllPairs();
 
-            if (sidebar.indexOf(val1) == -1) {
-                sidebar.push(val1);
-            }
-
-            if (!(val1 in values)) {
-                values[val1] = {};
-            }
-            values[val1][val2] = data[rn][2];
-        }
-
-        for (n in sidebar) {
-            // fill missing pairs with nulls
-            var val1 = sidebar[n];
-            rows[val1] = {};
-            for (m in header) {
-                var val2 = header[m];
-                if (val1 in values && val2 in values[val1]) {
-                    rows[val1][val2] = values[val1][val2];
-                } else {
-                    rows[val1][val2] = null;
+        var fillMissingPairs = function fillMissingPairs() {
+            for (var n in sidebar) {
+                // fill missing pairs with nulls
+                var val1 = sidebar[n];
+                rows[val1] = {};
+                for (var m in header) {
+                    var val2 = header[m];
+                    if (val1 in values && val2 in values[val1]) {
+                        rows[val1][val2] = values[val1][val2];
+                    } else {
+                        rows[val1][val2] = null;
+                    }
                 }
             }
-        }
+        };
+        fillMissingPairs();
 
         var header_html = [React.createElement('td', null)];
         header.forEach(function (item) {
@@ -792,7 +799,7 @@ var SqlDoc = React.createClass({
                 null,
                 item
             ));
-            for (i in rows[item]) {
+            for (var i in rows[item]) {
                 row.push(React.createElement(
                     'td',
                     null,
@@ -814,22 +821,13 @@ var SqlDoc = React.createClass({
         );
     },
 
-    renderMap: function renderMap(block_idx, dataset, dataset_idx, query) {
-        return React.createElement(
-            'div',
-            { className: 'error alert alert-danger' },
-            ' map rendering is not implemented yet '
-        );
-        this.mount_map = true;
-        return React.createElement('div', null);
-    },
-
     renderCsv: function renderCsv(block_idx, dataset, dataset_idx, query) {
+        // eslint-disable-line no-unused-vars
         var dsid = this.dsid(block_idx, dataset_idx);
 
         var out_fields = [];
         if (dataset.fields) {
-            var out_fields = dataset.fields.map(function (field, i) {
+            out_fields = dataset.fields.map(function (field, i) {
                 var ret = [];
                 ret.push(React.createElement(
                     'span',
@@ -910,12 +908,13 @@ var SqlDoc = React.createClass({
     },
 
     renderHidden: function renderHidden(block_idx, dataset, dataset_idx, query) {
+        // eslint-disable-line no-unused-vars
         return null;
     },
 
     selectAll: function selectAll() {
         // select content of entire output
-        node = ReactDOM.findDOMNode(this);
+        var node = ReactDOM.findDOMNode(this);
         var range = document.createRange();
         range.selectNodeContents(node);
         var sel = window.getSelection();
@@ -945,6 +944,7 @@ var SqlDoc = React.createClass({
     },
 
     scrollHandler: function scrollHandler(e) {
+        // eslint-disable-line no-unused-vars
         var container = $(ReactDOM.findDOMNode(this));
         for (var block_idx = 0; block_idx < this.state.data.length; block_idx++) {
             for (var dataset_idx = 0; dataset_idx < this.state.data[block_idx].datasets.length; dataset_idx++) {
@@ -1054,21 +1054,13 @@ var SqlDoc = React.createClass({
             $(this).css({ width: widths[i] });
         });
 
-        $(".output-console").bind('resize', function (e) {
+        $(".output-console").bind('resize', function () {
             self.showFloatingHeader(dsid, left);
         });
     },
 
-    hideFloatingHeader: function hideFloatingHeader(dsid) {
+    hideFloatingHeader: function hideFloatingHeader() {
         this.floatingHeader().hide();
-    },
-
-    adjustFloatingHeader: function adjustFloatingHeader() {
-        console.log(this.floatingHeader().is(':visible'));
-    },
-
-    mountMap: function mountMap(dom_node) {
-        // placeholder for future implementation
     },
 
     mount_charts: function mount_charts() {
@@ -1094,7 +1086,7 @@ var SqlDoc = React.createClass({
 
             var stacked = chart_args.match("\\s*stacked\\s*");
 
-            var fields = dataset.fields.map(function (field, i) {
+            var fields = dataset.fields.map(function (field) {
                 return field.name;
             });
 
@@ -1102,6 +1094,8 @@ var SqlDoc = React.createClass({
 
             var column_charts = ['line', 'spline', 'area', 'step', 'area-spline', 'area-step', 'bar', 'scatter'];
             var row_charts = ['pie', 'donut', 'gauge', 'bubble'];
+
+            var _div = $("div[data-chart-id='" + chart_id + "']");
 
             if (column_charts.indexOf(chart_type) != -1) {
                 // field name as a header
@@ -1132,12 +1126,13 @@ var SqlDoc = React.createClass({
                 if (chart_arg_x) {
 
                     var xfield = dataset.fields[chart_arg_x - 1];
+                    var axis;
                     if (xfield) {
 
                         data.x = xfield.name;
 
                         if (['DATE', 'Date'].indexOf(xfield.type) > -1) {
-                            var axis = {
+                            axis = {
                                 x: {
                                     type: 'timeseries',
                                     tick: {
@@ -1148,7 +1143,7 @@ var SqlDoc = React.createClass({
                         }
 
                         if (['TIMESTAMPTZ'].indexOf(xfield.type) > -1) {
-                            var axis = {
+                            axis = {
                                 x: {
                                     type: 'timeseries',
                                     tick: {
@@ -1165,7 +1160,7 @@ var SqlDoc = React.createClass({
                         }
 
                         if (['TIMESTAMP', 'DATETIME', 'DateTime', 'DateTime2'].indexOf(xfield.type) > -1) {
-                            var axis = {
+                            axis = {
                                 x: {
                                     type: 'timeseries',
                                     tick: {
@@ -1174,7 +1169,7 @@ var SqlDoc = React.createClass({
                                 }
                             };
                             // transform timestamp format to the one edible by d3
-                            for (var i = 1; i < data.rows.length; i++) {
+                            for (i = 1; i < data.rows.length; i++) {
                                 data.rows[i][chart_arg_x - 1] = data.rows[i][chart_arg_x - 1].replace(/(\.[0-9]{3})([0-9]*)$/g, '$1');
                             }
 
@@ -1188,10 +1183,6 @@ var SqlDoc = React.createClass({
                     // bubble chart is implemented not with c3
                     return self.mount_bubble_chart(chart_id, dataset);
                 }
-                if (chart_type == "tree") {
-                    // tree chart is implemented not with c3
-                    return mount_tree_chart(chart_id, dataset);
-                }
 
                 var columns = dataset.data;
                 data = {
@@ -1199,21 +1190,19 @@ var SqlDoc = React.createClass({
                     type: chart_type
                 };
             } else {
-                var _div = $("div[data-chart-id='" + chart_id + "']");
                 _div.html('<div class="connection-error alert alert-danger">Chart ' + chart_type + ' is not supported<div>');
                 return;
             }
 
             try {
-                var chart = c3.generate({
+                c3.generate({
                     bindto: chart_div,
                     data: data,
                     axis: axis
                 });
             } catch (err) {
-                var _div = $("div[data-chart-id='" + chart_id + "']");
+                _div = $("div[data-chart-id='" + chart_id + "']");
                 _div.html('<div class="connection-error alert alert-danger">Chart building error: ' + err + '<div>');
-                console.log(err);
                 return;
             }
         });
@@ -1225,7 +1214,7 @@ var SqlDoc = React.createClass({
             // don't mount if already mounted
             return;
         }
-        console.log(d3.select("[data-chart-id='" + chart_id + "']").attr("mounted", "true")); // mark as mounted
+        d3.select("[data-chart-id='" + chart_id + "']").attr("mounted", "true"); // mark as mounted
 
         var display_selected_name = d3.select("[data-chart-id='" + chart_id + "']").append("div").attr("class", "bubble-chart-selected-name").html("&nbsp;");
 
@@ -1300,39 +1289,46 @@ var SqlDoc = React.createClass({
         var xvalues = [];
         var values = {};
         var rows = {};
-        for (rn in dataset.data) {
-            // at first run fill the existing data (rows/columns/values)
-            if (rn == 0) {
-                // skip first row as it contains column names we don't need for pivot
-                continue;
-            }
-            var val1 = dataset.data[rn][0];
-            var val2 = dataset.data[rn][1];
-            if (column_names.indexOf(val2) == -1) {
-                column_names.push(val2);
-            }
-            if (xvalues.indexOf(val1) == -1) {
-                xvalues.push(val1);
-            }
-            if (!(val1 in values)) {
-                values[val1] = [];
-            }
-            values[val1][val2] = dataset.data[rn][2];
-        }
 
-        for (n in xvalues) {
-            // at second run fill the missing values with nulls
-            var val1 = xvalues[n];
-            rows[val1] = [];
-            for (m in column_names) {
-                var val2 = column_names[m];
-                if (val1 in values && val2 in values[val1]) {
-                    rows[val1].push(values[val1][val2]);
-                } else {
-                    rows[val1].push(null);
+        var fillExistingData = function fillExistingData() {
+            for (var rn in dataset.data) {
+                // at first run fill the existing data (rows/columns/values)
+                if (rn == 0) {
+                    // skip first row as it contains column names we don't need for pivot
+                    continue;
+                }
+                var val1 = dataset.data[rn][0];
+                var val2 = dataset.data[rn][1];
+                if (column_names.indexOf(val2) == -1) {
+                    column_names.push(val2);
+                }
+                if (xvalues.indexOf(val1) == -1) {
+                    xvalues.push(val1);
+                }
+                if (!(val1 in values)) {
+                    values[val1] = [];
+                }
+                values[val1][val2] = dataset.data[rn][2];
+            }
+        };
+        fillExistingData();
+
+        var fillMissingData = function fillMissingData() {
+            for (var n in xvalues) {
+                // at second run fill the missing values with nulls
+                var val1 = xvalues[n];
+                rows[val1] = [];
+                for (var m in column_names) {
+                    var val2 = column_names[m];
+                    if (val1 in values && val2 in values[val1]) {
+                        rows[val1].push(values[val1][val2]);
+                    } else {
+                        rows[val1].push(null);
+                    }
                 }
             }
-        }
+        };
+        fillMissingData();
 
         var res = [];
         column_names.unshift(dataset.fields[0].name);
