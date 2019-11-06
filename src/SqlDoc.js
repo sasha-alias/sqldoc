@@ -461,13 +461,34 @@ var SqlDoc = React.createClass({
         }
 
         var dsid = this.dsid(block_idx, dataset_idx);
+ 
+	var errorInfo = dataset.resultErrorMessage && dataset.resultErrorMessage.toString();
+
+        if (dataset.resultError) {
+          const err = dataset.resultError;
+          errorInfo = (
+            <div>
+              <div>
+                <strong>{err.severity}</strong>: {err.code} - {err.message}
+              </div>
+              {err.where && <pre>{err.where}</pre>}
+              {err.hint && (
+                <div>
+                  <br />
+                  {err.hint}
+                </div>
+              )}
+            </div>
+         );
+        }
+
 
         if (dataset.resultStatus == 'PGRES_COMMAND_OK'){
             return <div key={'cmdres_'+dsid} className="alert alert-success">{dataset.cmdStatus}</div>;
         } else if (['PGRES_FATAL_ERROR', 'PGRES_BAD_RESPONSE'].indexOf(dataset.resultStatus) > -1) {
-            return <div key={'err_'+dsid} className="query-error alert alert-danger">{dataset.resultErrorMessage.toString()}</div>;
+            return <div key={'err_'+dsid} className="query-error alert alert-danger">{errorInfo}</div>;
         } else if (dataset.resultStatus == 'PGRES_NONFATAL_ERROR') {
-            return <div key={'err_'+dsid} className="query-error alert alert-info">{dataset.resultErrorMessage.toString()}</div>;
+            return <div key={'err_'+dsid} className="query-error alert alert-info">{errorInfo}</div>;
         }
 
         // record highliting column option

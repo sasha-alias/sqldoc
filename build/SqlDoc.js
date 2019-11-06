@@ -537,6 +537,40 @@ var SqlDoc = React.createClass({
 
         var dsid = this.dsid(block_idx, dataset_idx);
 
+        var errorInfo = dataset.resultErrorMessage && dataset.resultErrorMessage.toString();
+
+        if (dataset.resultError) {
+            var err = dataset.resultError;
+            errorInfo = React.createElement(
+                'div',
+                null,
+                React.createElement(
+                    'div',
+                    null,
+                    React.createElement(
+                        'strong',
+                        null,
+                        err.severity
+                    ),
+                    ': ',
+                    err.code,
+                    ' - ',
+                    err.message
+                ),
+                err.where && React.createElement(
+                    'pre',
+                    null,
+                    err.where
+                ),
+                err.hint && React.createElement(
+                    'div',
+                    null,
+                    React.createElement('br', null),
+                    err.hint
+                )
+            );
+        }
+
         if (dataset.resultStatus == 'PGRES_COMMAND_OK') {
             return React.createElement(
                 'div',
@@ -547,13 +581,13 @@ var SqlDoc = React.createClass({
             return React.createElement(
                 'div',
                 { key: 'err_' + dsid, className: 'query-error alert alert-danger' },
-                dataset.resultErrorMessage.toString()
+                errorInfo
             );
         } else if (dataset.resultStatus == 'PGRES_NONFATAL_ERROR') {
             return React.createElement(
                 'div',
                 { key: 'err_' + dsid, className: 'query-error alert alert-info' },
-                dataset.resultErrorMessage.toString()
+                errorInfo
             );
         }
 
